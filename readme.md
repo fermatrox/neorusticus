@@ -1,3 +1,5 @@
+![NeoRusticus](assets/neorusticus-social-preview-github-1200x630.png)
+
 # Neorusticus
 
 [![Crates.io](https://img.shields.io/crates/v/neorusticus.svg)](https://crates.io/crates/neorusticus)
@@ -506,10 +508,10 @@ If you use Neorusticus in academic work, please cite:
 
 ```bibtex
 @software{neorusticus,
-  author = {Your Name},
+  author = {Jonas Forsman},
   title = {Neorusticus: A Modern Prolog Implementation in Rust},
-  year = {2024},
-  url = {https://github.com/yourusername/neorusticus}
+  year = {2025},
+  url = {https://github.com/fermatrox/neorusticus}
 }
 ```
 
