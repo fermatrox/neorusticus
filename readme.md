@@ -1,17 +1,15 @@
 ![NeoRusticus](assets/neorusticus-social-preview-github-1200x630.png)
 
-# Neorusticus
-
 [![Crates.io](https://img.shields.io/crates/v/neorusticus.svg)](https://crates.io/crates/neorusticus)
 [![Documentation](https://docs.rs/neorusticus/badge.svg)](https://docs.rs/neorusticus)
-[![Build Status](https://github.com/yourusername/neorusticus/workflows/CI/badge.svg)](https://github.com/yourusername/neorusticus/actions)
-[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](https://github.com/yourusername/neorusticus#license)
+[![Build Status](https://github.com/fermatrox/neorusticus/workflows/CI/badge.svg)](https://github.com/fermatrox/neorusticus/actions)
+[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](https://github.com/fermatrox/neorusticus#license)
 
 A modern Prolog implementation in Rust with enhanced error handling, comprehensive built-ins, and developer-friendly features.
 
-## 🏛️ Why "Neorusticus"?
+## 🏛️ Why "NeoRusticus"?
 
-The name **Neorusticus** carries deep meaning that reflects the project's philosophy and aspirations:
+The name **NeoRusticus** carries deep meaning that reflects the project's philosophy and aspirations:
 
 ### **Neo** - Modern Innovation
 
@@ -34,7 +32,7 @@ The "Neo" prefix represents the modern, experimental approach to logic programmi
 
 **🛠️ Experimental Spirit**: The "rough around the edges" connotation captures the experimental nature of this AI-assisted development project—it's a work in progress, a learning journey, not a polished commercial product.
 
-Together, **Neorusticus** embodies the vision of bringing classical logic programming wisdom into the modern era through Rust's safety and performance, while remaining open to experimental evolution.
+Together, **NeoRusticus** embodies the vision of bringing classical logic programming wisdom into the modern era through Rust's safety and performance, while remaining open to experimental evolution.
 
 ## Ψ The Logo
 
