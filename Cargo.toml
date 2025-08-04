@@ -8,6 +8,7 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/fermatrox/neorusticus"
 keywords = ["prolog", "logic-programming", "interpreter", "unification"]
 categories = ["compilers", "parsing"]
+readme = "README.md"
 
 [lib]
 name = "neorusticus"

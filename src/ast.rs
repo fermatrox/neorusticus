@@ -1,6 +1,14 @@
-// ast
+// Copyright 2025 Jonas Forsman
 //
-// TODO: Move relevant code from main.rs to this module
+// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
+// https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
+// <LICENSE-MIT or https://opensource.org/licenses/MIT>, at your
+// option. This file may not be copied, modified, or distributed
+// except according to those terms.
+
+// Project name: neorusticus
+// Filename: ast.rs
+// Creator: Jonas Forsman
 
 //! Abstract Syntax Tree types for Prolog terms and clauses
 //! 
@@ -13,6 +21,7 @@ use std::fmt;
 /// 
 /// Terms are the fundamental building blocks of Prolog programs.
 /// They can be atoms, variables, compound terms, or numbers.
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Term {
     /// An atom: a constant identifier like `foo` or `hello`

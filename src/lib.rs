@@ -1,6 +1,14 @@
-// lib.rs
+// Copyright 2025 Jonas Forsman
 //
-// TODO: Add lib.rs content from restructure plan
+// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
+// https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
+// <LICENSE-MIT or https://opensource.org/licenses/MIT>, at your
+// option. This file may not be copied, modified, or distributed
+// except according to those terms.
+
+// Project name: neorusticus
+// Filename: lib.rs
+// Creator: Jonas Forsman
 
 //! Neorusticus - A Prolog implementation in Rust
 //! 
@@ -24,6 +32,9 @@
 //! - [`parser`] - Parsing tokens into AST
 //! - [`unification`] - Unification algorithm
 //! - [`error`] - Error types and handling
+//! - [`builtins`] - Built-in predicates and functions
+//! - [`engine`] - The main Prolog engine for executing queries
+//! - [`utils`] - Utility functions for pretty printing, term manipulation, etc.
 
 pub mod error;
 pub mod lexer;
@@ -32,7 +43,7 @@ pub mod ast;
 pub mod unification;
 pub mod builtins;
 pub mod engine;
-pub mod utils;        // Uncommented
+pub mod utils;        
 
 // Re-export the main types and functions for easy use
 pub use engine::{PrologEngine, EngineStats, ExecutionContext};
