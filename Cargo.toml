@@ -1,0 +1,39 @@
+[package]
+name = "neorusticus"
+version = "0.1.0"
+edition = "2024"
+authors = ["jonas.p.forsman@gmail.com"]
+description = "A Prolog implementation in Rust with enhanced error handling"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/fermatrox/neorusticus"
+keywords = ["prolog", "logic-programming", "interpreter", "unification"]
+categories = ["compilers", "parsing"]
+
+[lib]
+name = "neorusticus"
+path = "src/lib.rs"
+
+[[example]]
+name = "basic_usage"
+path = "examples/basic_usage.rs"
+
+[[example]]
+name = "arithmetic"
+path = "examples/arithmetic.rs"
+
+[[example]]
+name = "interactive"
+path = "examples/interactive.rs"
+
+[dependencies]
+
+[dev-dependencies]
+criterion = "0.5"
+
+[features]
+default = []
+
+[[bench]]
+name = "engine_benchmark"
+harness = false
+path = "benches/engine_bench.rs"
