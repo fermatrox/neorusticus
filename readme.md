@@ -7,7 +7,7 @@
 
 A modern Prolog implementation in Rust with enhanced error handling, comprehensive built-ins, and developer-friendly features.
 
-## 🏛️ Why "NeoRusticus"?
+## Why "NeoRusticus"?
 
 The name **NeoRusticus** carries deep meaning that reflects the project's philosophy and aspirations:
 
@@ -24,51 +24,51 @@ The "Neo" prefix represents the modern, experimental approach to logic programmi
 
 "Rusticus" has multiple layers of meaning:
 
-**🏛️ Historical Depth**: References **Junius Rusticus**, the Stoic philosopher and teacher of Marcus Aurelius. This connection is perfect for logic programming, which has deep philosophical roots in formal reasoning and logical inference—core concepts in Stoic philosophy.
+** Historical Depth**: References **Junius Rusticus**, the Stoic philosopher and teacher of Marcus Aurelius. This connection is perfect for logic programming, which has deep philosophical roots in formal reasoning and logical inference—core concepts in Stoic philosophy.
 
-**🌾 Earthy Practicality**: In Latin, "rusticus" means "of the countryside"—practical, grounded, and unpretentious. This fits both Rust's earthy, no-nonsense approach to systems programming and the project's focus on building something genuinely useful rather than merely academic.
+** Earthy Practicality**: In Latin, "rusticus" means "of the countryside"—practical, grounded, and unpretentious. This fits both Rust's earthy, no-nonsense approach to systems programming and the project's focus on building something genuinely useful rather than merely academic.
 
-**🔬 Academic Gravitas**: The name sounds scholarly and distinctive, appropriate for a serious exploration of language implementation and logic programming concepts.
+** Academic Gravitas**: The name sounds scholarly and distinctive, appropriate for a serious exploration of language implementation and logic programming concepts.
 
-**🛠️ Experimental Spirit**: The "rough around the edges" connotation captures the experimental nature of this AI-assisted development project—it's a work in progress, a learning journey, not a polished commercial product.
+** Experimental Spirit**: The "rough around the edges" connotation captures the experimental nature of this AI-assisted development project—it's a work in progress, a learning journey, not a polished commercial product.
 
 Together, **NeoRusticus** embodies the vision of bringing classical logic programming wisdom into the modern era through Rust's safety and performance, while remaining open to experimental evolution.
 
-## Ψ The Logo
+## The Logo
 
 The **Psi (Ψ)** symbol serves as Neorusticus's logo, chosen for its rich symbolic meaning:
 
-### **🧠 Mind & Consciousness**
+### ** Mind & Consciousness**
 
 Psi represents the mind, consciousness, and mental processes—perfect for a system that performs logical reasoning and artificial intelligence.
 
-### **⚡ Computational Logic**
+### ** Computational Logic**
 
 In computer science and AI, Psi often symbolizes intelligent systems, logical inference, and computational thinking.
 
-### **🏛️ Classical Foundation**
+### ** Classical Foundation**
 
 The symbol's Greek origins echo the classical foundations of logic (Aristotle, Stoics) while the clean, geometric form represents modern computational precision.
 
-### **🚀 Transcendent Potential**
+### ** Transcendent Potential**
 
 The elevated, distinctive shape suggests rising above traditional limitations—fitting for a project that might evolve beyond conventional Prolog into experimental territories.
 
 The Psi symbol perfectly captures Neorusticus's essence: a bridge between ancient wisdom and modern innovation, between human reasoning and artificial intelligence, between classical logic and experimental possibilities.
 
-## 🎯 Project Goals
+## Project Goals
 
 Neorusticus serves multiple ambitious goals that go beyond just building another Prolog implementation:
 
-### 🦀 **Learn Rust Through Real-World Application**
+### **Learn Rust Through Real-World Application**
 
 Rather than learning Rust through tutorials and toy examples, this project explores advanced Rust concepts—pattern matching, error handling, lifetimes, zero-cost abstractions, and memory safety—through a substantial, practical implementation. Every design decision provides deep insights into what makes Rust unique for systems programming.
 
-### 🧠 **Deep Understanding of Prolog Implementation**
+### **Deep Understanding of Prolog Implementation**
 
 Building a complete Prolog interpreter from scratch—lexer, parser, unification algorithm, and execution engine—provides intimate knowledge of how logic programming languages work. This includes understanding SLD resolution, backtracking, cut operations, and the subtleties of variable scoping and renaming.
 
-### 🔬 **Flexible Framework for Future Exploration**
+### **Flexible Framework for Future Exploration**
 
 Neorusticus is designed as a foundation for exploring advanced logic programming concepts and experimental features. The modular architecture allows for future expansion into areas like:
 
@@ -79,18 +79,18 @@ Neorusticus is designed as a foundation for exploring advanced logic programming
 - Novel optimization techniques
 - Educational tools and visualizations
 
-### 🤖 **AI-Assisted Development Experiment**
+### **AI-Assisted Development Experiment**
 
 This project serves as a comprehensive case study in AI-assisted software development, with AI tools playing dual roles:
 
-- **🎓 Expert Advisor**: Providing architectural guidance, best practices, algorithm explanations, and design recommendations
-- **💻 Code Developer**: Generating implementations, writing tests, debugging issues, and refactoring code
+- ** Expert Advisor**: Providing architectural guidance, best practices, algorithm explanations, and design recommendations
+- ** Code Developer**: Generating implementations, writing tests, debugging issues, and refactoring code
 
 The goal is to evaluate how effectively AI can contribute to complex software projects when working with a technical leader who provides direction, requirements, and quality oversight. This collaboration model represents a new paradigm in software development that's worth studying and documenting.
 
 This multi-faceted approach makes Neorusticus both a learning vehicle and a research platform, demonstrating the potential of combining human expertise with AI capabilities to tackle ambitious technical projects.
 
-## 🚀 Features
+## Features
 
 - ✅ **Complete Prolog syntax** - Facts, rules, queries with proper operator precedence
 - ✅ **Rich built-in predicates** - Arithmetic, type checking, list operations, and control flow
@@ -103,7 +103,7 @@ This multi-faceted approach makes Neorusticus both a learning vehicle and a rese
 - ✅ **Type safety** - Comprehensive type checking predicates
 - ✅ **Comprehensive test suite** - Extensive tests covering all functionality
 
-## 📦 Installation
+## Installation
 
 Add this to your `Cargo.toml`:
 
@@ -118,7 +118,7 @@ Or install the CLI tool:
 cargo install neorusticus
 ```
 
-## 🎯 Quick Start
+## Quick Start
 
 ### Library Usage
 
@@ -177,7 +177,7 @@ Commands:
   clear   - Clear the database
 ```
 
-## 📚 Documentation
+## Documentation
 
 ### Built-in Predicates
 
@@ -240,7 +240,7 @@ let result = engine.parse_query("infinite(test).");
 // Error: Stack overflow (depth 50) in predicate: infinite/1
 ```
 
-## 🔧 Configuration
+## Configuration
 
 ### Engine Limits
 
@@ -273,7 +273,7 @@ match engine.parse_and_add("invalid syntax here") {
 }
 ```
 
-## 📖 Examples
+## Examples
 
 The `examples/` directory contains several demonstration programs:
 
@@ -301,7 +301,7 @@ cargo run --example interactive
 
 Full-featured REPL for experimenting with Prolog.
 
-## 🧪 Running Tests
+## Running Tests
 
 ```bash
 # Run all tests
@@ -317,7 +317,7 @@ cargo test engine::tests
 cargo test --test error_tests
 ```
 
-## 🏗️ Architecture
+## Architecture
 
 Neorusticus is built with a modular architecture:
 
@@ -330,7 +330,7 @@ Neorusticus is built with a modular architecture:
 - **`error`** - Comprehensive error types with suggestions
 - **`utils`** - Utility functions for pretty printing and analysis
 
-## 🎨 Prolog Syntax Supported
+## Prolog Syntax Supported
 
 ### Facts and Rules
 
@@ -389,7 +389,7 @@ max(3, 7)         % Maximum
 min(10, 5)        % Minimum
 ```
 
-## 🔬 Performance
+## Performance
 
 Neorusticus is designed for correctness and safety first, with reasonable performance:
 
@@ -404,13 +404,13 @@ Benchmarks (on modern hardware):
 - Complex recursive queries: ~100μs-1ms
 - Large fact databases: Scales linearly
 
-## 🤝 Contributing
+## Contributing
 
 This project is primarily a **personal learning experiment** and **AI-assisted development study**. As such, I'm not accepting direct code contributions at this time, as the goal is to evaluate how effectively complex software can be developed through AI collaboration.
 
 However, other types of contributions are very welcome and valuable:
 
-### 💡 **Ideas and Suggestions**
+### **Ideas and Suggestions**
 
 - Feature ideas for future exploration
 - Architectural improvements
@@ -418,28 +418,28 @@ However, other types of contributions are very welcome and valuable:
 - Ideas for experimental Prolog features
 - Suggestions for AI development methodology improvements
 
-### 🐛 **Bug Reports**
+### **Bug Reports**
 
 - Detailed bug reports with reproduction steps
 - Edge cases that break the engine
 - Parser or lexer issues
 - Documentation errors or unclear explanations
 
-### 💬 **Discussions**
+### **Discussions**
 
 - Feedback on implementation approaches
 - Discussions about Prolog language features
 - Thoughts on AI-assisted development process
 - Ideas for research directions or extensions
 
-### 📝 **Documentation and Examples**
+### **Documentation and Examples**
 
 - Suggestions for better documentation
 - Ideas for additional examples
 - Educational use cases
 - Tutorial improvements
 
-### 🧪 **Testing and Validation**
+### **Testing and Validation**
 
 - Testing the engine with complex Prolog programs
 - Validation against standard Prolog behavior
@@ -448,10 +448,10 @@ However, other types of contributions are very welcome and valuable:
 
 Please open **GitHub Issues** for any of the above! I'm particularly interested in:
 
-- 🤖 Feedback on the AI-assisted development approach
-- 🔬 Ideas for experimental features to explore
-- 📚 Educational use cases and examples
-- 🐛 Any bugs or limitations you discover
+- Feedback on the AI-assisted development approach
+- Ideas for experimental features to explore
+- Educational use cases and examples
+- Any bugs or limitations you discover
 
 ### Development Philosophy
 
@@ -459,7 +459,7 @@ This project serves as a case study in AI-human collaboration for complex softwa
 
 If you're interested in similar experiments or want to discuss the methodology, I'd love to hear from you!
 
-## 📊 Project Status
+## Project Status
 
 Neorusticus is in active development. Current status:
 
@@ -471,7 +471,7 @@ Neorusticus is in active development. Current status:
 - 🚧 **Advanced features** - Planned (constraints, tabling)
 - 📋 **Standard library** - Planned (more built-ins)
 
-## 📈 Roadmap
+## Roadmap
 
 ### Version 0.2.0
 
@@ -487,20 +487,20 @@ Neorusticus is in active development. Current status:
 - [ ] Debugging and tracing facilities
 - [ ] Integration with external databases
 
-## 🔗 Related Projects
+## Related Projects
 
 - **SWI-Prolog** - The most popular Prolog implementation
 - **GNU Prolog** - Fast, standard-compliant Prolog
 - **Tau Prolog** - Prolog in JavaScript
 - **Scryer Prolog** - Modern Prolog in Rust (different approach)
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - The Prolog community for decades of research and development
 - The Rust community for excellent tooling and libraries
 - Warren's Abstract Machine (WAM) for inspiring efficient Prolog implementation
 
-## 📝 Citation
+## Citation
 
 If you use Neorusticus in academic work, please cite:
 
