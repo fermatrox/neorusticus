@@ -9,6 +9,13 @@ repository = "https://github.com/fermatrox/neorusticus"
 keywords = ["prolog", "logic-programming", "interpreter", "unification"]
 categories = ["compilers", "parsing"]
 readme = "README.md"
+exclude = [
+    "benches/",
+	"target/",
+    "branding/",
+    "stuff/",
+	".github/",
+    ".copyright_header_to_rs",
 
 [lib]
 name = "neorusticus"

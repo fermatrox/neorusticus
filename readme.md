@@ -24,13 +24,13 @@ The "Neo" prefix represents the modern, experimental approach to logic programmi
 
 "Rusticus" has multiple layers of meaning:
 
-** Historical Depth**: References **Junius Rusticus**, the Stoic philosopher and teacher of Marcus Aurelius. This connection is perfect for logic programming, which has deep philosophical roots in formal reasoning and logical inference—core concepts in Stoic philosophy.
+**Historical Depth**: References **Junius Rusticus**, the Stoic philosopher and teacher of Marcus Aurelius. This connection is perfect for logic programming, which has deep philosophical roots in formal reasoning and logical inference—core concepts in Stoic philosophy.
 
-** Earthy Practicality**: In Latin, "rusticus" means "of the countryside"—practical, grounded, and unpretentious. This fits both Rust's earthy, no-nonsense approach to systems programming and the project's focus on building something genuinely useful rather than merely academic.
+**Earthy Practicality**: In Latin, "rusticus" means "of the countryside"—practical, grounded, and unpretentious. This fits both Rust's earthy, no-nonsense approach to systems programming and the project's focus on building something genuinely useful rather than merely academic.
 
-** Academic Gravitas**: The name sounds scholarly and distinctive, appropriate for a serious exploration of language implementation and logic programming concepts.
+**Academic Gravitas**: The name sounds scholarly and distinctive, appropriate for a serious exploration of language implementation and logic programming concepts.
 
-** Experimental Spirit**: The "rough around the edges" connotation captures the experimental nature of this AI-assisted development project—it's a work in progress, a learning journey, not a polished commercial product.
+**Experimental Spirit**: The "rough around the edges" connotation captures the experimental nature of this AI-assisted development project—it's a work in progress, a learning journey, not a polished commercial product.
 
 Together, **NeoRusticus** embodies the vision of bringing classical logic programming wisdom into the modern era through Rust's safety and performance, while remaining open to experimental evolution.
 
@@ -38,19 +38,19 @@ Together, **NeoRusticus** embodies the vision of bringing classical logic progra
 
 The **Psi (Ψ)** symbol serves as Neorusticus's logo, chosen for its rich symbolic meaning:
 
-### ** Mind & Consciousness**
+### **Mind & Consciousness**
 
 Psi represents the mind, consciousness, and mental processes—perfect for a system that performs logical reasoning and artificial intelligence.
 
-### ** Computational Logic**
+### **Computational Logic**
 
 In computer science and AI, Psi often symbolizes intelligent systems, logical inference, and computational thinking.
 
-### ** Classical Foundation**
+### **Classical Foundation**
 
 The symbol's Greek origins echo the classical foundations of logic (Aristotle, Stoics) while the clean, geometric form represents modern computational precision.
 
-### ** Transcendent Potential**
+### **Transcendent Potential**
 
 The elevated, distinctive shape suggests rising above traditional limitations—fitting for a project that might evolve beyond conventional Prolog into experimental territories.
 
@@ -83,8 +83,8 @@ Neorusticus is designed as a foundation for exploring advanced logic programming
 
 This project serves as a comprehensive case study in AI-assisted software development, with AI tools playing dual roles:
 
-- ** Expert Advisor**: Providing architectural guidance, best practices, algorithm explanations, and design recommendations
-- ** Code Developer**: Generating implementations, writing tests, debugging issues, and refactoring code
+- **Expert Advisor**: Providing architectural guidance, best practices, algorithm explanations, and design recommendations
+- **Code Developer**: Generating implementations, writing tests, debugging issues, and refactoring code
 
 The goal is to evaluate how effectively AI can contribute to complex software projects when working with a technical leader who provides direction, requirements, and quality oversight. This collaboration model represents a new paradigm in software development that's worth studying and documenting.
 
