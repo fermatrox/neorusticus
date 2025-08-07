@@ -25,24 +25,34 @@ pub struct BuiltinPredicates;
 
 impl BuiltinPredicates {
     /// Check if a predicate is built-in
+    /// 
+    /// This function is used by the engine to determine whether a goal should be
+    /// handled by the built-in system or searched for in the user-defined clauses.
+    /// The pattern matching groups predicates by category for clarity.
     pub fn is_builtin(functor: &str, arity: usize) -> bool {
         match (functor, arity) {
             // Arithmetic predicates
+            // These evaluate arithmetic expressions and compare numeric values
             ("is", 2) | ("=:=", 2) | ("=\\=", 2) | (">", 2) | ("<", 2) | (">=", 2) | ("=<", 2) => true,
             
             // Unification predicates
+            // These perform structural unification or check non-unifiability
             ("=", 2) | ("\\=", 2) => true,
             
             // Type checking predicates
+            // These test the type of a term (with or without substitution applied)
             ("var", 1) | ("nonvar", 1) | ("atom", 1) | ("number", 1) | ("compound", 1) => true,
             
             // List operations
+            // Standard Prolog list manipulation predicates
             ("append", 3) | ("member", 2) | ("length", 2) => true,
             
             // Control predicates
+            // These control the flow of execution and backtracking
             ("true", 0) | ("fail", 0) | ("!", 0) => true,
             
             // I/O predicates (basic)
+            // Simple output operations
             ("write", 1) | ("nl", 0) => true,
             
             _ => false,
@@ -50,6 +60,15 @@ impl BuiltinPredicates {
     }
     
     /// Execute a built-in predicate
+    /// 
+    /// This is the main dispatcher for built-in predicates. It:
+    /// 1. Pattern matches on the goal to extract the functor and arguments
+    /// 2. Dispatches to the appropriate handler function
+    /// 3. Handles special atom predicates (true, fail, !, nl)
+    /// 4. Returns appropriate errors for unknown predicates or type mismatches
+    /// 
+    /// The `context` parameter is used for cut operation, which sets a flag
+    /// to prevent backtracking in the engine.
     pub fn execute(
         goal: &Term, 
         subst: &mut Substitution, 
@@ -58,6 +77,7 @@ impl BuiltinPredicates {
     ) -> RuntimeResult<()> {
         match goal {
             Term::Compound(functor, args) => {
+                // Most built-in predicates are compound terms with arguments
                 match (functor.as_str(), args.len()) {
                     // Arithmetic predicates
                     ("is", 2) => Self::handle_is(&args[0], &args[1], subst, solutions)?,
@@ -124,6 +144,17 @@ impl BuiltinPredicates {
     }
     
     /// Suggest similar predicate names for typos
+    /// 
+    /// Uses the Levenshtein distance algorithm to find the most similar built-in
+    /// predicate to what the user typed. This helps users discover typos and
+    /// learn the correct predicate names.
+    /// 
+    /// The algorithm:
+    /// 1. Computes edit distance between the input and each known predicate
+    /// 2. Adds a penalty for arity mismatches (0.5 per difference)
+    /// 3. Returns the best match if the score is reasonable (≤ 4.0)
+    /// 
+    /// This provides helpful "Did you mean...?" suggestions in error messages.
     fn suggest_predicate(functor: &str, arity: usize) -> Option<String> {
         let known_predicates = vec![
             ("is", 2), ("=:=", 2), ("=\\=", 2), (">", 2), ("<", 2), (">=", 2), ("=<", 2),
@@ -140,6 +171,7 @@ impl BuiltinPredicates {
             let name_distance = levenshtein_distance(functor, pred_name) as f64;
             
             // Calculate arity penalty - exact arity match gets no penalty
+            // This helps distinguish between predicates with the same name but different arities
             let arity_penalty = if arity == pred_arity {
                 0.0
             } else {
@@ -156,6 +188,7 @@ impl BuiltinPredicates {
         }
         
         // Only return suggestion if the score is reasonable
+        // This avoids suggesting completely unrelated predicates
         if best_score <= 4.0 {
             best_match
         } else {
@@ -164,17 +197,34 @@ impl BuiltinPredicates {
     }
     
     // Arithmetic evaluation with comprehensive error handling
-    fn evaluate_arithmetic(term: &Term, subst: &Substitution) -> RuntimeResult<i64> {
+    /// 
+    /// Recursively evaluates arithmetic expressions to produce an i64 value.
+    /// This function handles:
+    /// - Simple numbers (return as-is)
+    /// - Variables (must be bound to a numeric value)
+    /// - Compound expressions with operators (+, -, *, //, mod, abs, max, min)
+    /// 
+    /// All operations use checked arithmetic to detect overflow. The special case
+    /// of abs(i64::MIN) is handled explicitly since it would overflow i64::MAX.
+    /// 
+    /// The recursion allows complex nested expressions like: (2 + 3) * (4 - 1)
+    pub(crate) fn evaluate_arithmetic(term: &Term, subst: &Substitution) -> RuntimeResult<i64> {
+        // First, apply any existing substitutions to resolve variables
         let resolved = Unifier::apply_substitution(term, subst);
         match &resolved {
             Term::Number(n) => Ok(*n),
-            Term::Variable(var) => Err(RuntimeError::UninstantiatedVariable {
-                variable: var.clone(),
-                context: "arithmetic evaluation".to_string(),
-            }),
+            Term::Variable(var) => {
+                // Variables must be instantiated before arithmetic evaluation
+                Err(RuntimeError::UninstantiatedVariable {
+                    variable: var.clone(),
+                    context: "arithmetic evaluation".to_string(),
+                })
+            },
             Term::Compound(op, args) => {
+                // Dispatch based on operator and arity
                 match (op.as_str(), args.len()) {
                     ("+", 2) => {
+                        // Binary addition with overflow check
                         let left = Self::evaluate_arithmetic(&args[0], subst)?;
                         let right = Self::evaluate_arithmetic(&args[1], subst)?;
                         left.checked_add(right).ok_or_else(|| RuntimeError::ArithmeticError {
@@ -233,8 +283,20 @@ impl BuiltinPredicates {
                         }
                     }
                     ("abs", 1) => {
+                        // Absolute value with special handling for i64::MIN
                         let operand = Self::evaluate_arithmetic(&args[0], subst)?;
-                        Ok(operand.abs())
+                        // Handle i64::MIN special case - abs would overflow
+                        // i64::MIN is -9223372036854775808, but i64::MAX is 9223372036854775807
+                        // So abs(i64::MIN) would be 9223372036854775808, which overflows
+                        if operand == i64::MIN {
+                            Err(RuntimeError::ArithmeticError {
+                                operation: "abs".to_string(),
+                                operands: args.clone(),
+                                reason: "Integer overflow: abs(i64::MIN) exceeds i64::MAX".to_string(),
+                            })
+                        } else {
+                            Ok(operand.abs())
+                        }
                     }
                     ("max", 2) => {
                         let left = Self::evaluate_arithmetic(&args[0], subst)?;
@@ -262,7 +324,17 @@ impl BuiltinPredicates {
     }
     
     // Arithmetic predicates
-    fn handle_is(left: &Term, right: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) -> RuntimeResult<()> {
+    
+    /// Handle the 'is' predicate: X is Expression
+    /// 
+    /// Evaluates the arithmetic expression on the right and attempts to unify
+    /// the result with the left term. This is how Prolog performs arithmetic:
+    /// - If left is a variable, it gets bound to the computed value
+    /// - If left is a number, it must equal the computed value
+    /// - If left is a compound term, unification rules apply
+    /// 
+    /// Example: X is 2 + 3 will bind X to 5
+    pub(crate) fn handle_is(left: &Term, right: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) -> RuntimeResult<()> {
         let value = Self::evaluate_arithmetic(right, subst)?;
         let result_term = Term::Number(value);
         let mut new_subst = subst.clone();
@@ -272,7 +344,12 @@ impl BuiltinPredicates {
         Ok(())
     }
     
-    fn handle_arithmetic_equal(left: &Term, right: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) -> RuntimeResult<()> {
+    /// Handle arithmetic equality: Expr1 =:= Expr2
+    /// 
+    /// Evaluates both expressions and succeeds if they produce the same value.
+    /// Unlike unification (=), this performs arithmetic evaluation first.
+    /// Example: 2+3 =:= 5 succeeds, but 2+3 = 5 fails (structures differ)
+    pub(crate) fn handle_arithmetic_equal(left: &Term, right: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) -> RuntimeResult<()> {
         let left_val = Self::evaluate_arithmetic(left, subst)?;
         let right_val = Self::evaluate_arithmetic(right, subst)?;
         if left_val == right_val {
@@ -281,7 +358,7 @@ impl BuiltinPredicates {
         Ok(())
     }
     
-    fn handle_arithmetic_not_equal(left: &Term, right: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) -> RuntimeResult<()> {
+    pub(crate) fn handle_arithmetic_not_equal(left: &Term, right: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) -> RuntimeResult<()> {
         let left_val = Self::evaluate_arithmetic(left, subst)?;
         let right_val = Self::evaluate_arithmetic(right, subst)?;
         if left_val != right_val {
@@ -290,7 +367,7 @@ impl BuiltinPredicates {
         Ok(())
     }
     
-    fn handle_greater(left: &Term, right: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) -> RuntimeResult<()> {
+    pub(crate) fn handle_greater(left: &Term, right: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) -> RuntimeResult<()> {
         let left_val = Self::evaluate_arithmetic(left, subst)?;
         let right_val = Self::evaluate_arithmetic(right, subst)?;
         if left_val > right_val {
@@ -299,7 +376,7 @@ impl BuiltinPredicates {
         Ok(())
     }
     
-    fn handle_less(left: &Term, right: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) -> RuntimeResult<()> {
+    pub(crate) fn handle_less(left: &Term, right: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) -> RuntimeResult<()> {
         let left_val = Self::evaluate_arithmetic(left, subst)?;
         let right_val = Self::evaluate_arithmetic(right, subst)?;
         if left_val < right_val {
@@ -308,7 +385,7 @@ impl BuiltinPredicates {
         Ok(())
     }
     
-    fn handle_greater_equal(left: &Term, right: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) -> RuntimeResult<()> {
+    pub(crate) fn handle_greater_equal(left: &Term, right: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) -> RuntimeResult<()> {
         let left_val = Self::evaluate_arithmetic(left, subst)?;
         let right_val = Self::evaluate_arithmetic(right, subst)?;
         if left_val >= right_val {
@@ -317,7 +394,7 @@ impl BuiltinPredicates {
         Ok(())
     }
     
-    fn handle_less_equal(left: &Term, right: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) -> RuntimeResult<()> {
+    pub(crate) fn handle_less_equal(left: &Term, right: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) -> RuntimeResult<()> {
         let left_val = Self::evaluate_arithmetic(left, subst)?;
         let right_val = Self::evaluate_arithmetic(right, subst)?;
         if left_val <= right_val {
@@ -327,14 +404,29 @@ impl BuiltinPredicates {
     }
     
     // Unification predicates
-    fn handle_unify(left: &Term, right: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) {
+    
+    /// Handle unification: Term1 = Term2
+    /// 
+    /// Attempts to make two terms identical through variable substitution.
+    /// This is structural unification - it doesn't evaluate arithmetic.
+    /// Creates a new substitution that includes any new bindings needed.
+    /// 
+    /// Example: f(X, 2) = f(1, Y) succeeds with X->1, Y->2
+    pub(crate) fn handle_unify(left: &Term, right: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) {
         let mut new_subst = subst.clone();
         if Unifier::unify(left, right, &mut new_subst) {
             solutions.push(new_subst);
         }
     }
     
-    fn handle_not_unify(left: &Term, right: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) {
+    /// Handle non-unification: Term1 \= Term2
+    /// 
+    /// Succeeds if the terms cannot be unified. This is the negation of =.
+    /// Note: We test unification on a copy of the substitution to avoid
+    /// modifying the original if unification would succeed.
+    /// 
+    /// Example: 1 \= 2 succeeds, X \= X fails
+    pub(crate) fn handle_not_unify(left: &Term, right: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) {
         let mut test_subst = subst.clone();
         if !Unifier::unify(left, right, &mut test_subst) {
             solutions.push(subst.clone());
@@ -342,35 +434,56 @@ impl BuiltinPredicates {
     }
     
     // Type checking predicates
-    fn handle_var(term: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) {
+    
+    /// Check if a term is an unbound variable
+    /// 
+    /// First applies substitutions to see if the variable is bound.
+    /// Succeeds only if the result is still a variable (unbound).
+    /// Example: var(X) succeeds if X is unbound, fails if X = 5
+    pub(crate) fn handle_var(term: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) {
         let resolved = Unifier::apply_substitution(term, subst);
         if matches!(resolved, Term::Variable(_)) {
             solutions.push(subst.clone());
         }
     }
     
-    fn handle_nonvar(term: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) {
+    /// Check if a term is not a variable (or is a bound variable)
+    /// 
+    /// The opposite of var/1. Succeeds if the term is an atom, number,
+    /// compound, or a variable that's bound to a non-variable.
+    pub(crate) fn handle_nonvar(term: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) {
         let resolved = Unifier::apply_substitution(term, subst);
         if !matches!(resolved, Term::Variable(_)) {
             solutions.push(subst.clone());
         }
     }
     
-    fn handle_atom(term: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) {
+    /// Check if a term is an atom
+    /// 
+    /// Atoms are constants like 'hello', 'foo', or '[]'.
+    /// Variables bound to atoms also succeed.
+    pub(crate) fn handle_atom(term: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) {
         let resolved = Unifier::apply_substitution(term, subst);
         if matches!(resolved, Term::Atom(_)) {
             solutions.push(subst.clone());
         }
     }
     
-    fn handle_number(term: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) {
+    /// Check if a term is a number
+    /// 
+    /// Succeeds for integer literals or variables bound to numbers.
+    pub(crate) fn handle_number(term: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) {
         let resolved = Unifier::apply_substitution(term, subst);
         if matches!(resolved, Term::Number(_)) {
             solutions.push(subst.clone());
         }
     }
     
-    fn handle_compound(term: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) {
+    /// Check if a term is a compound term
+    /// 
+    /// Compound terms have a functor and arguments, like f(a, b).
+    /// Note: In Prolog, f() with zero arguments is still compound, not an atom.
+    pub(crate) fn handle_compound(term: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) {
         let resolved = Unifier::apply_substitution(term, subst);
         if matches!(resolved, Term::Compound(_, _)) {
             solutions.push(subst.clone());
@@ -378,8 +491,23 @@ impl BuiltinPredicates {
     }
     
     // List operations
-    fn handle_append(list1: &Term, list2: &Term, result: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) -> RuntimeResult<()> {
-        // append([], L, L).
+    
+    /// Handle list concatenation: append(List1, List2, Result)
+    /// 
+    /// This implements the classic Prolog append predicate with two clauses:
+    /// 1. Base case: append([], L, L) - appending empty list to L gives L
+    /// 2. Recursive case: append([H|T], L, [H|R]) :- append(T, L, R)
+    /// 
+    /// The implementation generates unique variable names to avoid conflicts
+    /// during recursion. It also includes a depth check to prevent stack
+    /// overflow on very long lists (limit of 100 elements).
+    /// 
+    /// This predicate can be used in multiple modes:
+    /// - append([1,2], [3,4], X) - concatenate two lists
+    /// - append(X, Y, [1,2,3]) - find ways to split a list
+    /// - append([1|X], [3], [1,2,3]) - find middle elements
+    pub(crate) fn handle_append(list1: &Term, list2: &Term, result: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) -> RuntimeResult<()> {
+        // Base case: append([], L, L).
         let mut subst1 = subst.clone();
         let empty_list = Term::Atom("[]".to_string());
         if Unifier::unify(list1, &empty_list, &mut subst1) && 
@@ -387,13 +515,15 @@ impl BuiltinPredicates {
             solutions.push(subst1);
         }
         
-        // append([H|T], L, [H|R]) :- append(T, L, R).
-        // Use a counter to generate unique variable names
-        let var_suffix = format!("_{}", solutions.len() + subst.len()); // More unique suffix
+        // Recursive case: append([H|T], L, [H|R]) :- append(T, L, R).
+        // Generate unique variable names to avoid conflicts
+        // We use the current solution count and substitution size for uniqueness
+        let var_suffix = format!("_{}", solutions.len() + subst.len());
         let h_var = Term::Variable(format!("H{}", var_suffix));
         let t_var = Term::Variable(format!("T{}", var_suffix));
         let r_var = Term::Variable(format!("R{}", var_suffix));
         
+        // Create patterns for unification
         let list1_pattern = Term::Compound(".".to_string(), vec![h_var.clone(), t_var.clone()]);
         let result_pattern = Term::Compound(".".to_string(), vec![h_var.clone(), r_var.clone()]);
         
@@ -407,7 +537,8 @@ impl BuiltinPredicates {
             let resolved_r = Unifier::apply_substitution(&r_var, &subst2);
             
             // Add depth check to prevent infinite recursion
-            if Self::get_list_length(&resolved_t).unwrap_or(0) < 100 { // Safety limit
+            // This limits recursion to lists of length < 100
+            if Self::get_list_length(&resolved_t).unwrap_or(0) < 100 {
                 // Recursive call: append(T, L, R)
                 Self::handle_append(&resolved_t, &resolved_list2, &resolved_r, &mut subst2, solutions)?;
             }
@@ -415,41 +546,64 @@ impl BuiltinPredicates {
         Ok(())
     }
     
-    // Helper function to safely get list length
-    fn get_list_length(term: &Term) -> Option<usize> {
+    /// Helper function to safely get list length
+    /// 
+    /// Returns Some(length) for proper lists ending in []
+    /// Returns None for improper lists or lists containing variables
+    /// This is used to implement the recursion depth limit in append/3
+    pub(crate) fn get_list_length(term: &Term) -> Option<usize> {
         match term {
             Term::Atom(name) if name == "[]" => Some(0),
             Term::Compound(functor, args) if functor == "." && args.len() == 2 => {
+                // Recursively count elements in the tail
                 Self::get_list_length(&args[1]).map(|len| len + 1)
             }
             _ => None, // Not a proper list or contains variables
         }
     }
     
-    fn handle_member(element: &Term, list: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) -> RuntimeResult<()> {
+    /// Handle list membership: member(Element, List)
+    /// 
+    /// Checks if Element is a member of List, or generates all members.
+    /// Implements two clauses:
+    /// 1. member(X, [H|T]) :- X = H. (element is the head)
+    /// 2. member(X, [H|T]) :- member(X, T). (element is in the tail)
+    /// 
+    /// This predicate can be used in multiple modes:
+    /// - member(2, [1,2,3]) - check if 2 is in the list
+    /// - member(X, [1,2,3]) - generate all members
+    /// - member(2, X) - error (list must be instantiated)
+    /// 
+    /// The implementation is naturally recursive, checking the head first,
+    /// then recursively checking the tail.
+    pub(crate) fn handle_member(element: &Term, list: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) -> RuntimeResult<()> {
         let resolved_list = Unifier::apply_substitution(list, subst);
         
         match resolved_list {
             Term::Compound(ref functor, ref args) if functor == "." && args.len() == 2 => {
-                // member(X, [H|T]) :- X = H.
+                // Case 1: member(X, [H|T]) :- X = H.
+                // Try to unify the element with the head of the list
                 let mut subst1 = subst.clone();
                 if Unifier::unify(element, &args[0], &mut subst1) {
                     solutions.push(subst1);
                 }
                 
-                // member(X, [H|T]) :- member(X, T).
+                // Case 2: member(X, [H|T]) :- member(X, T).
+                // Recursively check the tail
                 Self::handle_member(element, &args[1], subst, solutions)?;
             }
             Term::Atom(ref name) if name == "[]" => {
-                // Empty list - member fails
+                // Empty list - member fails (no solutions added)
             }
             Term::Variable(_) => {
+                // List must be instantiated for member/2 to work
                 return Err(RuntimeError::UninstantiatedVariable {
                     variable: format!("{}", resolved_list),
                     context: "member/2 second argument".to_string(),
                 });
             }
             _ => {
+                // Not a valid list structure
                 return Err(RuntimeError::InvalidListStructure {
                     term: resolved_list,
                     expected: "proper list".to_string(),
@@ -459,13 +613,26 @@ impl BuiltinPredicates {
         Ok(())
     }
     
-    fn handle_length(list: &Term, length: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) -> RuntimeResult<()> {
+    /// Handle list length: length(List, Length)
+    /// 
+    /// Computes or checks the length of a list.
+    /// The list must be instantiated (no unbound variables).
+    /// 
+    /// Modes of use:
+    /// - length([1,2,3], X) - compute length, bind X to 3
+    /// - length([1,2,3], 3) - check that length is 3
+    /// - length(X, 3) - error (can't generate lists of given length)
+    /// 
+    /// The implementation walks the list structure counting elements.
+    pub(crate) fn handle_length(list: &Term, length: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) -> RuntimeResult<()> {
         let resolved_list = Unifier::apply_substitution(list, subst);
         
         match Self::calculate_list_length(&resolved_list) {
             Ok(len) => {
+                // Create a number term with the computed length
                 let length_term = Term::Number(len);
                 let mut new_subst = subst.clone();
+                // Try to unify with the provided length term
                 if Unifier::unify(length, &length_term, &mut new_subst) {
                     solutions.push(new_subst);
                 }
@@ -475,10 +642,19 @@ impl BuiltinPredicates {
         Ok(())
     }
     
-    fn calculate_list_length(list: &Term) -> RuntimeResult<i64> {
+    /// Calculate the length of a list
+    /// 
+    /// Recursively walks the list structure counting elements.
+    /// Returns an error if:
+    /// - The list contains unbound variables
+    /// - The structure is not a proper list (doesn't end with [])
+    /// 
+    /// This is a helper for length/2 that does the actual counting.
+    pub(crate) fn calculate_list_length(list: &Term) -> RuntimeResult<i64> {
         match list {
             Term::Atom(name) if name == "[]" => Ok(0),
             Term::Compound(functor, args) if functor == "." && args.len() == 2 => {
+                // Recursively count the tail and add 1 for the head
                 let tail_len = Self::calculate_list_length(&args[1])?;
                 Ok(tail_len + 1)
             }
@@ -494,9 +670,19 @@ impl BuiltinPredicates {
     }
     
     // I/O predicates
-    fn handle_write(term: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) {
+    
+    /// Handle output: write(Term)
+    /// 
+    /// Outputs a term to standard output. Variables are shown with their
+    /// current bindings applied. Always succeeds after writing.
+    /// 
+    /// Note: This uses print! without a newline, so multiple writes
+    /// appear on the same line. Use nl/0 to output a newline.
+    pub(crate) fn handle_write(term: &Term, subst: &mut Substitution, solutions: &mut Vec<Substitution>) {
+        // Apply substitutions to show the current value of any variables
         let resolved = Unifier::apply_substitution(term, subst);
         print!("{}", resolved);
+        // write/1 always succeeds
         solutions.push(subst.clone());
     }
     
@@ -540,349 +726,7 @@ impl BuiltinPredicates {
     }
 }
 
+// Link to the test module
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use std::collections::HashMap;
-
-    fn create_test_context() -> crate::engine::ExecutionContext {
-        crate::engine::ExecutionContext::new()
-    }
-
-    #[test]
-    fn test_is_builtin() {
-        assert!(BuiltinPredicates::is_builtin("is", 2));
-        assert!(BuiltinPredicates::is_builtin("append", 3));
-        assert!(BuiltinPredicates::is_builtin("!", 0));
-        assert!(!BuiltinPredicates::is_builtin("unknown", 1));
-    }
-
-    #[test]
-    fn test_arithmetic_is() {
-        let mut subst = HashMap::new();
-        let mut solutions = Vec::new();
-        
-        let left = Term::Variable("X".to_string());
-        let right = Term::Compound("+".to_string(), vec![
-            Term::Number(2),
-            Term::Number(3)
-        ]);
-        
-        BuiltinPredicates::handle_is(&left, &right, &mut subst, &mut solutions).unwrap();
-        
-        assert_eq!(solutions.len(), 1);
-        assert_eq!(solutions[0].get("X"), Some(&Term::Number(5)));
-    }
-
-    #[test]
-    fn test_arithmetic_comparison() {
-        let mut subst = HashMap::new();
-        let mut solutions = Vec::new();
-        
-        let left = Term::Number(5);
-        let right = Term::Number(3);
-        
-        BuiltinPredicates::handle_greater(&left, &right, &mut subst, &mut solutions).unwrap();
-        assert_eq!(solutions.len(), 1);
-        
-        solutions.clear();
-        BuiltinPredicates::handle_less(&left, &right, &mut subst, &mut solutions).unwrap();
-        assert_eq!(solutions.len(), 0);
-    }
-
-    #[test]
-    fn test_unification() {
-        let mut subst = HashMap::new();
-        let mut solutions = Vec::new();
-        
-        let term1 = Term::Variable("X".to_string());
-        let term2 = Term::Atom("hello".to_string());
-        
-        BuiltinPredicates::handle_unify(&term1, &term2, &mut subst, &mut solutions);
-        
-        assert_eq!(solutions.len(), 1);
-        assert_eq!(solutions[0].get("X"), Some(&Term::Atom("hello".to_string())));
-    }
-
-    #[test]
-    fn test_type_checking() {
-        let mut subst = HashMap::new();
-        let mut solutions = Vec::new();
-        
-        let var = Term::Variable("X".to_string());
-        let atom = Term::Atom("hello".to_string());
-        
-        // Test var/1
-        BuiltinPredicates::handle_var(&var, &mut subst, &mut solutions);
-        assert_eq!(solutions.len(), 1);
-        
-        solutions.clear();
-        BuiltinPredicates::handle_var(&atom, &mut subst, &mut solutions);
-        assert_eq!(solutions.len(), 0);
-        
-        // Test atom/1
-        solutions.clear();
-        BuiltinPredicates::handle_atom(&atom, &mut subst, &mut solutions);
-        assert_eq!(solutions.len(), 1);
-    }
-
-    #[test]
-    fn test_list_append() {
-        let mut subst = HashMap::new();
-        let mut solutions = Vec::new();
-        
-        let list1 = Term::from_list(vec![Term::Number(1), Term::Number(2)]);
-        let list2 = Term::from_list(vec![Term::Number(3)]);
-        let result = Term::Variable("X".to_string());
-        
-        BuiltinPredicates::handle_append(&list1, &list2, &result, &mut subst, &mut solutions).unwrap();
-        
-        assert!(solutions.len() > 0, "Should find at least one solution");
-        
-        // Check that we can find the appended result
-        let mut found_correct_result = false;
-        for solution in &solutions {
-            if let Some(x_binding) = solution.get("X") {
-                let resolved = Unifier::apply_substitution(x_binding, solution);
-                if let Some(elements) = resolved.to_list() {
-                    if elements.len() == 3 &&
-                       elements[0] == Term::Number(1) &&
-                       elements[1] == Term::Number(2) &&
-                       elements[2] == Term::Number(3) {
-                        found_correct_result = true;
-                        break;
-                    }
-                }
-            }
-        }
-        
-        assert!(found_correct_result, "Should find the correct append result [1,2,3]");
-        
-        // Test the base case: append([], [3], X)
-        solutions.clear();
-        subst.clear();
-        let empty_list = Term::Atom("[]".to_string());
-        BuiltinPredicates::handle_append(&empty_list, &list2, &result, &mut subst, &mut solutions).unwrap();
-        
-        assert_eq!(solutions.len(), 1, "Empty list append should have exactly one solution");
-        if let Some(x_binding) = solutions[0].get("X") {
-            let resolved = Unifier::apply_substitution(x_binding, &solutions[0]);
-            if let Some(elements) = resolved.to_list() {
-                assert_eq!(elements.len(), 1);
-                assert_eq!(elements[0], Term::Number(3));
-            } else {
-                panic!("Result should be a proper list");
-            }
-        }
-    }
-
-    #[test]
-    fn test_list_member() {
-        let mut subst = HashMap::new();
-        let mut solutions = Vec::new();
-        
-        let element = Term::Number(2);
-        let list = Term::from_list(vec![Term::Number(1), Term::Number(2), Term::Number(3)]);
-        
-        BuiltinPredicates::handle_member(&element, &list, &mut subst, &mut solutions).unwrap();
-        
-        assert!(solutions.len() > 0); // Should find the element
-        
-        // Test non-member
-        solutions.clear();
-        let non_element = Term::Number(4);
-        BuiltinPredicates::handle_member(&non_element, &list, &mut subst, &mut solutions).unwrap();
-        assert_eq!(solutions.len(), 0); // Should not find the element
-    }
-
-    #[test]
-    fn test_list_length() {
-        let mut subst = HashMap::new();
-        let mut solutions = Vec::new();
-        
-        let list = Term::from_list(vec![Term::Number(1), Term::Number(2), Term::Number(3)]);
-        let length = Term::Variable("L".to_string());
-        
-        BuiltinPredicates::handle_length(&list, &length, &mut subst, &mut solutions).unwrap();
-        
-        assert_eq!(solutions.len(), 1);
-        assert_eq!(solutions[0].get("L"), Some(&Term::Number(3)));
-    }
-
-    #[test]
-    fn test_control_predicates() {
-        let mut subst = HashMap::new();
-        let mut solutions = Vec::new();
-        let mut context = create_test_context();
-        
-        // Test true/0
-        let true_goal = Term::Atom("true".to_string());
-        BuiltinPredicates::execute(&true_goal, &mut subst, &mut solutions, &mut context).unwrap();
-        assert_eq!(solutions.len(), 1);
-        
-        // Test fail/0
-        solutions.clear();
-        let fail_goal = Term::Atom("fail".to_string());
-        BuiltinPredicates::execute(&fail_goal, &mut subst, &mut solutions, &mut context).unwrap();
-        assert_eq!(solutions.len(), 0);
-        
-        // Test cut/0
-        solutions.clear();
-        context.reset_cut();
-        let cut_goal = Term::Atom("!".to_string());
-        BuiltinPredicates::execute(&cut_goal, &mut subst, &mut solutions, &mut context).unwrap();
-        assert_eq!(solutions.len(), 1);
-        assert!(context.is_cut_called());
-    }
-
-    #[test]
-    fn test_arithmetic_evaluation() {
-        // Test complex arithmetic expression
-        let expr = Term::Compound("+".to_string(), vec![
-            Term::Compound("*".to_string(), vec![Term::Number(2), Term::Number(3)]),
-            Term::Number(4)
-        ]);
-        
-        let subst = HashMap::new();
-        let result = BuiltinPredicates::evaluate_arithmetic(&expr, &subst).unwrap();
-        assert_eq!(result, 10); // (2 * 3) + 4 = 10
-    }
-
-    #[test]
-    fn test_division_by_zero() {
-        let expr = Term::Compound("//".to_string(), vec![
-            Term::Number(5),
-            Term::Number(0)
-        ]);
-        
-        let subst = HashMap::new();
-        let result = BuiltinPredicates::evaluate_arithmetic(&expr, &subst);
-        assert!(result.is_err());
-        
-        if let Err(RuntimeError::DivisionByZero { .. }) = result {
-            // Expected error
-        } else {
-            panic!("Expected DivisionByZero error");
-        }
-    }
-
-    #[test]
-    fn test_uninstantiated_variable_error() {
-        let expr = Term::Compound("+".to_string(), vec![
-            Term::Variable("X".to_string()),
-            Term::Number(1)
-        ]);
-        
-        let subst = HashMap::new();
-        let result = BuiltinPredicates::evaluate_arithmetic(&expr, &subst);
-        assert!(result.is_err());
-        
-        if let Err(RuntimeError::UninstantiatedVariable { .. }) = result {
-            // Expected error
-        } else {
-            panic!("Expected UninstantiatedVariable error");
-        }
-    }
-
-    #[test]
-    fn test_predicate_suggestions() {
-        // Test typo suggestions
-        let suggestion = BuiltinPredicates::suggest_predicate("lentgh", 2);
-        assert!(suggestion.is_some());
-        assert!(suggestion.unwrap().contains("length"));
-        
-        let suggestion = BuiltinPredicates::suggest_predicate("appendd", 3);
-        assert!(suggestion.is_some());
-        assert!(suggestion.unwrap().contains("append"));
-        
-        // Test completely wrong predicate
-        let suggestion = BuiltinPredicates::suggest_predicate("totally_wrong", 5);
-        assert!(suggestion.is_none());
-    }
-
-    #[test]
-    fn test_arithmetic_operators() {
-        let subst = HashMap::new();
-        
-        // Test subtraction
-        let expr = Term::Compound("-".to_string(), vec![Term::Number(10), Term::Number(3)]);
-        assert_eq!(BuiltinPredicates::evaluate_arithmetic(&expr, &subst).unwrap(), 7);
-        
-        // Test multiplication
-        let expr = Term::Compound("*".to_string(), vec![Term::Number(4), Term::Number(5)]);
-        assert_eq!(BuiltinPredicates::evaluate_arithmetic(&expr, &subst).unwrap(), 20);
-        
-        // Test modulo
-        let expr = Term::Compound("mod".to_string(), vec![Term::Number(17), Term::Number(5)]);
-        assert_eq!(BuiltinPredicates::evaluate_arithmetic(&expr, &subst).unwrap(), 2);
-        
-        // Test unary minus
-        let expr = Term::Compound("-".to_string(), vec![Term::Number(42)]);
-        assert_eq!(BuiltinPredicates::evaluate_arithmetic(&expr, &subst).unwrap(), -42);
-    }
-
-    #[test]
-    fn test_extended_arithmetic() {
-        let subst = HashMap::new();
-        
-        // Test abs
-        let expr = Term::Compound("abs".to_string(), vec![Term::Number(-5)]);
-        assert_eq!(BuiltinPredicates::evaluate_arithmetic(&expr, &subst).unwrap(), 5);
-        
-        // Test max
-        let expr = Term::Compound("max".to_string(), vec![Term::Number(3), Term::Number(7)]);
-        assert_eq!(BuiltinPredicates::evaluate_arithmetic(&expr, &subst).unwrap(), 7);
-        
-        // Test min
-        let expr = Term::Compound("min".to_string(), vec![Term::Number(3), Term::Number(7)]);
-        assert_eq!(BuiltinPredicates::evaluate_arithmetic(&expr, &subst).unwrap(), 3);
-    }
-
-    #[test]
-    fn test_list_builtin_info() {
-        let builtins = BuiltinPredicates::list_builtins();
-        assert!(!builtins.is_empty());
-        
-        // Check that some expected predicates are listed
-        let names: Vec<&String> = builtins.iter().map(|(name, _, _)| name).collect();
-        assert!(names.contains(&&"is".to_string()));
-        assert!(names.contains(&&"append".to_string()));
-        assert!(names.contains(&&"member".to_string()));
-        assert!(names.contains(&&"true".to_string()));
-    }
-
-    #[test]
-    fn test_complex_list_operations() {
-        let mut subst = HashMap::new();
-        let mut solutions = Vec::new();
-        
-        // Test append with variables
-        let x = Term::Variable("X".to_string());
-        let y = Term::Variable("Y".to_string());
-        let result = Term::from_list(vec![Term::Number(1), Term::Number(2), Term::Number(3)]);
-        
-        BuiltinPredicates::handle_append(&x, &y, &result, &mut subst, &mut solutions).unwrap();
-        
-        // Should find multiple solutions for different ways to split the list
-        assert!(solutions.len() > 1);
-    }
-
-    #[test]
-    fn test_error_handling_in_execute() {
-        let mut subst = HashMap::new();
-        let mut solutions = Vec::new();
-        let mut context = create_test_context();
-        
-        // Test unknown predicate
-        let unknown_goal = Term::Compound("unknown_predicate".to_string(), vec![Term::Number(1)]);
-        let result = BuiltinPredicates::execute(&unknown_goal, &mut subst, &mut solutions, &mut context);
-        
-        assert!(result.is_err());
-        if let Err(RuntimeError::PredicateNotFound { functor, arity, .. }) = result {
-            assert_eq!(functor, "unknown_predicate");
-            assert_eq!(arity, 1);
-        } else {
-            panic!("Expected PredicateNotFound error");
-        }
-    }
-}
+#[path = "builtins_tests.rs"]
+mod tests;
