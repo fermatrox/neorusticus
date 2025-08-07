@@ -49,6 +49,8 @@ impl ExecutionContext {
     
     /// Create a new execution context with custom stack depth limit
     pub fn with_max_depth(max_depth: usize) -> Self {
+        // Create default context and then customize the max depth
+        // This ensures all other defaults are properly set
         let mut ctx = Self::new();
         ctx.max_stack_depth = max_depth;
         ctx
@@ -56,10 +58,14 @@ impl ExecutionContext {
     
     /// Enter a predicate call (increments stack depth)
     pub fn enter_predicate(&mut self, predicate: String) -> RuntimeResult<()> {
+        // Increment depth FIRST to check against limit
+        // This prevents off-by-one errors in stack overflow detection
         self.stack_depth += 1;
         self.current_predicate = predicate.clone();
         
         // Check stack depth immediately to prevent runaway recursion
+        // We check AFTER incrementing to ensure we catch the overflow
+        // at the right depth (e.g., max_depth=5 means 5 levels deep)
         if self.stack_depth > self.max_stack_depth {
             return Err(RuntimeError::StackOverflow {
                 depth: self.stack_depth,
@@ -72,13 +78,19 @@ impl ExecutionContext {
     
     /// Exit a predicate call (decrements stack depth)
     pub fn exit_predicate(&mut self) {
+        // Guard against underflow - should never happen in correct usage
+        // but provides safety against bugs
         if self.stack_depth > 0 {
             self.stack_depth -= 1;
         }
+        // Note: We don't reset current_predicate as it may be useful
+        // for debugging to know the last predicate even after exit
     }
     
     /// Set the cut flag (prevents backtracking)
     pub fn cut(&mut self) {
+        // Cut is a Prolog operation that commits to the current choice
+        // Once set, the engine won't try alternative clauses
         self.cut_called = true;
     }
     
@@ -89,11 +101,15 @@ impl ExecutionContext {
     
     /// Reset the cut flag
     pub fn reset_cut(&mut self) {
+        // Used when entering a new branch of execution where
+        // the previous cut should not apply
         self.cut_called = false;
     }
     
     /// Set the cut level for nested cuts
     pub fn set_cut_level(&mut self, level: usize) {
+        // Cut levels help manage nested cuts in complex rule structures
+        // Higher levels represent deeper nesting
         self.cut_level = level;
     }
     
@@ -119,6 +135,8 @@ impl ExecutionContext {
     
     /// Set the maximum allowed stack depth
     pub fn set_max_stack_depth(&mut self, max_depth: usize) {
+        // Allows runtime adjustment of stack limits
+        // Useful for different query complexity requirements
         self.max_stack_depth = max_depth;
     }
 }
@@ -149,20 +167,29 @@ impl EngineStats {
     
     /// Update predicate count when a clause is added
     pub fn add_predicate(&mut self, functor: &str, arity: usize) {
+        // Create a key in Prolog notation: functor/arity (e.g., "parent/2")
+        // This is the standard way to identify predicates in Prolog
         let key = format!("{}/{}", functor, arity);
+        
+        // Use entry API to either increment existing count or insert 1
+        // This efficiently handles both new and existing predicates
         *self.predicates_defined.entry(key).or_insert(0) += 1;
     }
     
     /// Get the number of different predicates defined
     pub fn predicate_count(&self) -> usize {
+        // Each key in the HashMap represents a unique predicate signature
+        // e.g., parent/2 and parent/3 are counted as different predicates
         self.predicates_defined.len()
     }
     
     /// Get the most frequently defined predicate
     pub fn most_common_predicate(&self) -> Option<(String, usize)> {
+        // Find the predicate with the maximum number of clauses
+        // This helps identify which predicates have the most rules/facts
         self.predicates_defined.iter()
-            .max_by_key(|(_, count)| *count)
-            .map(|(name, count)| (name.clone(), *count))
+            .max_by_key(|(_, count)| *count)  // Compare by clause count
+            .map(|(name, count)| (name.clone(), *count))  // Clone to return owned data
     }
 }
 
@@ -220,53 +247,68 @@ impl PrologEngine {
     
     /// Parse and add a clause from a string
     pub fn parse_and_add(&mut self, input: &str) -> ParseResult<()> {
+        // Step 1: Tokenize the input string into a sequence of tokens
         let mut tokenizer = Tokenizer::new(input);
         let tokens = tokenizer.tokenize().map_err(|e| {
+            // Log tokenization errors for debugging
             eprintln!("Tokenization error: {}", e);
             e
         })?;
         
+        // Step 2: Parse the tokens into a clause (fact or rule)
         let mut parser = Parser::new(tokens);
         let clause = parser.parse_clause().map_err(|e| {
             eprintln!("Parse error in clause: {}", e);
             e
         })?;
         
+        // Step 3: Ensure the clause ends with a dot (Prolog convention)
         parser.expect(Token::Dot).map_err(|e| {
             eprintln!("Expected '.' at end of clause: {}", e);
             e
         })?;
         
-        // Update statistics
+        // Step 4: Update statistics with the new predicate information
+        // This tracks what predicates are defined and how many clauses each has
         if let Some((functor, arity)) = clause.head_functor_arity() {
             self.stats.add_predicate(functor, arity);
         }
         
+        // Step 5: Add the parsed clause to the database
         self.add_clause(clause);
         Ok(())
     }
     
     /// Parse and execute a query from a string
     pub fn parse_query(&mut self, input: &str) -> Result<Vec<Substitution>, Box<dyn std::error::Error>> {
+        // Step 1: Tokenize the query string
         let mut tokenizer = Tokenizer::new(input);
         let tokens = tokenizer.tokenize()?;
         let mut parser = Parser::new(tokens);
         
+        // Step 2: Parse the query as a list of goals (comma-separated terms)
         let goals = parser.parse_query()?;
         
-        // Accept either '?' or '.' at end of query
+        // Step 3: Accept either '?' or '.' at end of query
+        // Different Prolog systems use different conventions
         if *parser.current_token() == Token::Question {
             parser.advance();
         } else {
             parser.expect(Token::Dot)?;
         }
         
+        // Step 4: Track query execution in statistics
         self.stats.queries_executed += 1;
+        
+        // Step 5: Execute the query and return solutions
+        // Box the error for uniform error type across parse and runtime errors
         self.query(goals).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
     }
     
     /// Parse a single term from a string (useful for testing)
     pub fn parse_term(input: &str) -> ParseResult<Term> {
+        // Static method for parsing a term without needing an engine instance
+        // Useful for unit tests and REPL interactions
         let mut tokenizer = Tokenizer::new(input);
         let tokens = tokenizer.tokenize()?;
         let mut parser = Parser::new(tokens);
@@ -276,25 +318,37 @@ impl PrologEngine {
     
     /// Add a clause to the database
     pub fn add_clause(&mut self, clause: Clause) {
+        // Update the clause count for statistics
         self.stats.clause_count += 1;
+        // Add to the clause vector (acts as our knowledge base)
         self.clauses.push(clause);
     }
     
     /// Add a fact (clause with no body)
     pub fn add_fact(&mut self, head: Term) {
+        // Create a fact from the head term
         let clause = Clause::fact(head);
+        
+        // Update predicate statistics if the head has a valid functor
         if let Some((functor, arity)) = clause.head_functor_arity() {
             self.stats.add_predicate(functor, arity);
         }
+        
+        // Add the fact to the database
         self.add_clause(clause);
     }
     
     /// Add a rule (clause with body)
     pub fn add_rule(&mut self, head: Term, body: Vec<Term>) {
+        // Create a rule from head and body terms
         let clause = Clause::rule(head, body);
+        
+        // Update predicate statistics
         if let Some((functor, arity)) = clause.head_functor_arity() {
             self.stats.add_predicate(functor, arity);
         }
+        
+        // Add the rule to the database
         self.add_clause(clause);
     }
     
@@ -305,39 +359,60 @@ impl PrologEngine {
     
     /// Clear all clauses from the database
     pub fn clear(&mut self) {
+        // Remove all clauses from the knowledge base
         self.clauses.clear();
+        
+        // Reset statistics but preserve the configured limits
+        // We keep max_solutions as it's a configuration, not a statistic
         self.stats = EngineStats::new();
         self.stats.max_solutions = self.max_solutions;
+        
+        // Reset the variable counter used for renaming
         self.variable_counter = 0;
     }
     
     /// Rename variables in a clause to avoid conflicts
     fn rename_clause_variables(&mut self, clause: &Clause) -> Clause {
+        // Create a mapping from original variable names to new unique names
+        // This prevents variable name conflicts when using the same clause multiple times
         let mut var_map = HashMap::new();
         
+        // Inner function to recursively rename variables in a term
         fn rename_term(term: &Term, var_map: &mut HashMap<String, String>, counter: &mut usize) -> Term {
             match term {
                 Term::Variable(var) => {
+                    // Check if we've already renamed this variable
                     if let Some(new_var) = var_map.get(var) {
+                        // Use the existing renamed version for consistency
                         Term::Variable(new_var.clone())
                     } else {
+                        // Create a new unique variable name with _G prefix
+                        // _G stands for "generated" and is a Prolog convention
                         let new_var = format!("_G{}", counter);
                         *counter += 1;
+                        
+                        // Store the mapping for future occurrences of this variable
                         var_map.insert(var.clone(), new_var.clone());
                         Term::Variable(new_var)
                     }
                 }
                 Term::Compound(functor, args) => {
+                    // Recursively rename variables in all arguments
                     let new_args: Vec<Term> = args.iter()
                         .map(|arg| rename_term(arg, var_map, counter))
                         .collect();
                     Term::Compound(functor.clone(), new_args)
                 }
+                // Atoms and numbers don't contain variables, return as-is
                 _ => term.clone(),
             }
         }
         
+        // Rename variables in the head
         let new_head = rename_term(&clause.head, &mut var_map, &mut self.variable_counter);
+        
+        // Rename variables in the body, using the same var_map to ensure consistency
+        // Variables with the same name in head and body get the same new name
         let new_body: Vec<Term> = clause.body.iter()
             .map(|goal| rename_term(goal, &mut var_map, &mut self.variable_counter))
             .collect();
@@ -347,15 +422,22 @@ impl PrologEngine {
     
     /// Query the database with a list of goals
     pub fn query(&mut self, goals: Vec<Term>) -> RuntimeResult<Vec<Substitution>> {
+        // Initialize the solution collector
         let mut solutions = Vec::new();
+        
+        // Create execution context with configured stack depth limit
         let mut context = ExecutionContext::with_max_depth(self.stats.max_stack_depth);
+        
+        // Start with empty substitution (no variables bound yet)
         let initial_subst = HashMap::new();
         
         // Apply substitutions to goals to ensure they're properly grounded
+        // This handles cases where goals might already contain some substitutions
         let substituted_goals: Vec<Term> = goals.iter()
             .map(|goal| Unifier::apply_substitution(goal, &initial_subst))
             .collect();
-            
+        
+        // Start the recursive goal solving process
         self.solve_goals_with_cut(substituted_goals, initial_subst, &mut context, &mut solutions)?;
         Ok(solutions)
     }
@@ -364,6 +446,7 @@ impl PrologEngine {
     fn solve_goals_with_cut(&mut self, goals: Vec<Term>, subst: Substitution, 
                            context: &mut ExecutionContext, solutions: &mut Vec<Substitution>) -> RuntimeResult<()> {
         // Check solution limit to prevent runaway queries
+        // This protects against infinite or very large result sets
         if solutions.len() >= self.max_solutions {
             return Err(RuntimeError::ArithmeticError {
                 operation: "query".to_string(),
@@ -372,16 +455,19 @@ impl PrologEngine {
             });
         }
         
+        // Base case: all goals solved successfully
         if goals.is_empty() {
-            // All goals solved - we have a solution
+            // We have a complete solution - add the current substitution
             solutions.push(subst);
             return Ok(());
         }
         
+        // Process the first goal in the list
         let current_goal = &goals[0];
         let remaining_goals = goals[1..].to_vec();
         
         // Track predicate for stack overflow detection
+        // Format as functor/arity for clear error messages
         let predicate_name = match current_goal {
             Term::Compound(functor, args) => format!("{}/{}", functor, args.len()),
             Term::Atom(functor) => format!("{}/0", functor),
@@ -389,10 +475,14 @@ impl PrologEngine {
         };
         
         // CRITICAL: Check stack depth BEFORE any recursive work
+        // This prevents stack overflow by catching deep recursion early
         context.enter_predicate(predicate_name.clone())?;
         
+        // Delegate to internal method for actual goal solving
+        // This separation ensures consistent stack tracking
         let result = self.solve_goal_internal(current_goal, remaining_goals, subst, context, solutions);
         
+        // Always exit the predicate, even if solving failed
         context.exit_predicate();
         result
     }
@@ -401,7 +491,8 @@ impl PrologEngine {
     fn solve_goal_internal(&mut self, current_goal: &Term, remaining_goals: Vec<Term>, 
                           subst: Substitution, context: &mut ExecutionContext, 
                           solutions: &mut Vec<Substitution>) -> RuntimeResult<()> {
-        // Check if current goal is a built-in predicate
+        // First, check if this is a built-in predicate
+        // Built-ins are handled specially and don't search the clause database
         let is_builtin = match current_goal {
             Term::Compound(functor, args) => BuiltinPredicates::is_builtin(functor, args.len()),
             Term::Atom(functor) => BuiltinPredicates::is_builtin(functor, 0),
@@ -409,55 +500,72 @@ impl PrologEngine {
         };
         
         if is_builtin {
-            // Handle built-in predicate
+            // Handle built-in predicate through the builtins module
             let mut builtin_solutions = Vec::new();
             let mut builtin_subst = subst.clone();
+            
+            // Execute the built-in, which may produce multiple solutions
             BuiltinPredicates::execute(current_goal, &mut builtin_subst, &mut builtin_solutions, context)?;
             
+            // For each solution from the built-in, continue with remaining goals
             for solution_subst in builtin_solutions {
-                // Apply substitution to remaining goals and continue
+                // Apply the new substitution to remaining goals
+                // This ensures variables bound by the built-in are propagated
                 let substituted_goals: Vec<Term> = remaining_goals.iter()
                     .map(|goal| Unifier::apply_substitution(goal, &solution_subst))
                     .collect();
                 
+                // Recursively solve the remaining goals
                 self.solve_goals_with_cut(substituted_goals, solution_subst, context, solutions)?;
                 
                 // If cut was called, stop trying more solutions
+                // Cut prevents backtracking to alternative solutions
                 if context.is_cut_called() {
                     break;
                 }
             }
         } else {
-            // Clone clauses to avoid borrowing issues
+            // User-defined predicate: search the clause database
+            // Clone clauses to avoid borrowing issues during recursion
             let clauses = self.clauses.clone();
             
             // Try to unify with each clause in the database
             for clause in clauses.iter() {
+                // Rename variables in the clause to avoid conflicts
+                // Each use of a clause gets fresh variable names
                 let renamed_clause = self.rename_clause_variables(clause);
                 let mut new_subst = subst.clone();
                 
+                // Try to unify the goal with the clause head
                 if Unifier::unify(current_goal, &renamed_clause.head, &mut new_subst) {
-                    // Unification succeeded - add body goals to remaining goals
+                    // Unification succeeded - the clause matches our goal
+                    
+                    // Add the clause body goals to the remaining goals
+                    // Body goals must be satisfied for the clause to succeed
                     let mut new_goals = renamed_clause.body;
                     new_goals.extend(remaining_goals.iter().cloned());
                     
-                    // Apply current substitution to new goals
+                    // Apply current substitution to all new goals
+                    // This propagates variable bindings from unification
                     let substituted_goals: Vec<Term> = new_goals.iter()
                         .map(|goal| Unifier::apply_substitution(goal, &new_subst))
                         .collect();
                     
-                    // Reset cut flag for this branch
+                    // Save and reset cut state for this branch
+                    // Each branch gets its own cut context
                     let cut_was_called = context.is_cut_called();
                     context.reset_cut();
                     
+                    // Recursively solve the new goal list
                     self.solve_goals_with_cut(substituted_goals, new_subst, context, solutions)?;
                     
                     // If cut was called in this branch, don't try more clauses
+                    // Cut commits to the current clause choice
                     if context.is_cut_called() {
                         break;
                     }
                     
-                    // Restore cut state
+                    // Restore cut state for parent context
                     if cut_was_called {
                         context.cut();
                     }
@@ -470,53 +578,65 @@ impl PrologEngine {
     
     /// Pretty print solutions with variable bindings
     pub fn print_solutions(&self, solutions: &[Substitution], original_vars: &[String]) {
+        // Handle the case of no solutions (query failed)
         if solutions.is_empty() {
             println!("false.");
             return;
         }
         
+        // Print each solution, separated by semicolons (Prolog convention)
         for (i, solution) in solutions.iter().enumerate() {
-            if i > 0 { println!(" ;"); }
+            if i > 0 { 
+                println!(" ;");  // Semicolon indicates alternative solutions
+            }
             
+            // Collect variable bindings for this solution
             let mut bindings = Vec::new();
             for var in original_vars {
                 if let Some(value) = solution.get(var) {
                     // Apply substitution recursively to get the final value
+                    // This resolves chains like X -> Y, Y -> 5 to X -> 5
                     let final_value = Unifier::apply_substitution(value, solution);
                     bindings.push(format!("{} = {}", var, final_value));
                 }
             }
             
+            // Print the bindings or "true" if no variables
             if bindings.is_empty() {
-                print!("true");
+                print!("true");  // Query succeeded with no variable bindings
             } else {
                 print!("{}", bindings.join(", "));
             }
         }
-        println!(".");
+        println!(".");  // End with a dot (Prolog convention)
     }
     
     /// Print solutions in a more detailed format
     pub fn print_solutions_detailed(&self, solutions: &[Substitution], original_vars: &[String]) {
+        // Handle no solutions case
         if solutions.is_empty() {
             println!("No solutions found.");
             return;
         }
         
+        // Print header with solution count
         println!("Found {} solution(s):", solutions.len());
         
+        // Print each solution with clear formatting
         for (i, solution) in solutions.iter().enumerate() {
             println!("Solution {}:", i + 1);
             
             let mut has_bindings = false;
             for var in original_vars {
                 if let Some(value) = solution.get(var) {
+                    // Resolve the final value through substitution chains
                     let final_value = Unifier::apply_substitution(value, solution);
                     println!("  {} = {}", var, final_value);
                     has_bindings = true;
                 }
             }
             
+            // If no bindings, the query succeeded without binding variables
             if !has_bindings {
                 println!("  true");
             }
@@ -525,9 +645,11 @@ impl PrologEngine {
     
     /// Enhanced error reporting
     pub fn print_error<E: std::error::Error>(&self, error: &E) {
+        // Print the main error message
         eprintln!("Error: {}", error);
         
-        // Print additional context if available
+        // Print chain of causation if available
+        // This helps debug complex errors with multiple causes
         let mut source = error.source();
         while let Some(err) = source {
             eprintln!("  Caused by: {}", err);
@@ -537,9 +659,11 @@ impl PrologEngine {
     
     /// Alternative method for boxed errors
     pub fn print_boxed_error(&self, error: &Box<dyn std::error::Error>) {
+        // Same as print_error but for boxed error types
+        // Useful when errors are type-erased
         eprintln!("Error: {}", error);
         
-        // Print additional context if available
+        // Print causation chain
         let mut source = error.source();
         while let Some(err) = source {
             eprintln!("  Caused by: {}", err);
@@ -559,11 +683,16 @@ impl PrologEngine {
     
     /// Find clauses that match a given functor and arity
     pub fn find_clauses(&self, functor: &str, arity: usize) -> Vec<&Clause> {
+        // Filter clauses to find those matching the given predicate signature
+        // This is used for predicate lookup and debugging
         self.clauses.iter()
             .filter(|clause| {
+                // Extract functor and arity from the clause head
                 if let Some((clause_functor, clause_arity)) = clause.head_functor_arity() {
+                    // Check if both functor name and arity match
                     clause_functor == functor && clause_arity == arity
                 } else {
+                    // Clause head doesn't have a valid functor (shouldn't happen normally)
                     false
                 }
             })
@@ -572,22 +701,29 @@ impl PrologEngine {
     
     /// Check if a predicate is defined in the database
     pub fn is_predicate_defined(&self, functor: &str, arity: usize) -> bool {
+        // A predicate is defined if:
+        // 1. There are user-defined clauses for it, OR
+        // 2. It's a built-in predicate
         self.find_clauses(functor, arity).len() > 0 || BuiltinPredicates::is_builtin(functor, arity)
     }
     
     /// Get a list of all defined predicates
     pub fn list_predicates(&self) -> Vec<(String, usize, usize)> {
+        // Create a map to count clauses per predicate
         let mut predicates = HashMap::new();
         
         // Count user-defined predicates
         for clause in &self.clauses {
             if let Some((functor, arity)) = clause.head_functor_arity() {
+                // Create a key for the predicate (functor, arity pair)
                 let key = (functor.to_string(), arity);
+                // Increment the clause count for this predicate
                 *predicates.entry(key).or_insert(0) += 1;
             }
         }
         
         // Convert to vector: (functor, arity, clause_count)
+        // This format is useful for displaying predicate information
         predicates.into_iter()
             .map(|((functor, arity), count)| (functor, arity, count))
             .collect()
@@ -595,11 +731,14 @@ impl PrologEngine {
     
     /// Get a list of all built-in predicates
     pub fn list_builtins(&self) -> Vec<(String, usize, String)> {
+        // Delegate to the builtins module which maintains the list
         BuiltinPredicates::list_builtins()
     }
     
     /// Export the database as a string (useful for saving/loading)
     pub fn export_database(&self) -> String {
+        // Convert each clause to its string representation with a dot
+        // Join them with newlines to create a valid Prolog program
         self.clauses.iter()
             .map(|clause| format!("{}.", clause))
             .collect::<Vec<_>>()
@@ -608,43 +747,58 @@ impl PrologEngine {
     
     /// Load a database from a string
     pub fn load_database(&mut self, input: &str) -> Vec<ParseError> {
+        // Collect any parse errors encountered during loading
         let mut errors = Vec::new();
         
+        // Process each line of the input
         for line in input.lines() {
             let line = line.trim();
+            
+            // Skip empty lines and comments (lines starting with %)
             if line.is_empty() || line.starts_with('%') {
-                continue; // Skip empty lines and comments
+                continue;
             }
             
+            // Try to parse and add the clause, collecting any errors
             if let Err(e) = self.parse_and_add(line) {
                 errors.push(e);
             }
         }
         
+        // Return all errors encountered (empty if successful)
         errors
     }
     
     /// Set the maximum number of solutions
     pub fn set_max_solutions(&mut self, max_solutions: usize) {
+        // Update both the engine's limit and the statistics
         self.max_solutions = max_solutions;
         self.stats.max_solutions = max_solutions;
     }
     
     /// Set the maximum stack depth
     pub fn set_max_stack_depth(&mut self, max_depth: usize) {
+        // Update the statistics (used when creating contexts)
         self.stats.max_stack_depth = max_depth;
     }
     
     /// Reset statistics
     pub fn reset_stats(&mut self) {
+        // Preserve configuration values
         let max_solutions = self.stats.max_solutions;
         let max_stack_depth = self.stats.max_stack_depth;
+        
+        // Create fresh statistics
         self.stats = EngineStats::new();
+        
+        // Restore configuration values
         self.stats.max_solutions = max_solutions;
         self.stats.max_stack_depth = max_stack_depth;
+        
+        // Recalculate clause count from current database
         self.stats.clause_count = self.clauses.len();
         
-        // Recalculate predicate counts
+        // Recalculate predicate counts by scanning all clauses
         for clause in &self.clauses {
             if let Some((functor, arity)) = clause.head_functor_arity() {
                 self.stats.add_predicate(functor, arity);
@@ -659,435 +813,7 @@ impl Default for PrologEngine {
     }
 }
 
+// Link to the test module
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_engine_creation() {
-        let engine = PrologEngine::new();
-        assert_eq!(engine.clauses.len(), 0);
-        assert_eq!(engine.max_solutions, 100);
-    }
-
-    #[test]
-    fn test_add_facts() {
-        let mut engine = PrologEngine::new();
-        
-        engine.add_fact(Term::Compound("parent".to_string(), vec![
-            Term::Atom("tom".to_string()),
-            Term::Atom("bob".to_string())
-        ]));
-        
-        assert_eq!(engine.clauses.len(), 1);
-        assert!(engine.clauses[0].is_fact());
-    }
-
-    #[test]
-    fn test_add_rules() {
-        let mut engine = PrologEngine::new();
-        
-        let head = Term::Compound("grandparent".to_string(), vec![
-            Term::Variable("X".to_string()),
-            Term::Variable("Z".to_string())
-        ]);
-        
-        let body = vec![
-            Term::Compound("parent".to_string(), vec![
-                Term::Variable("X".to_string()),
-                Term::Variable("Y".to_string())
-            ]),
-            Term::Compound("parent".to_string(), vec![
-                Term::Variable("Y".to_string()),
-                Term::Variable("Z".to_string())
-            ])
-        ];
-        
-        engine.add_rule(head, body);
-        
-        assert_eq!(engine.clauses.len(), 1);
-        assert!(engine.clauses[0].is_rule());
-        assert_eq!(engine.clauses[0].body.len(), 2);
-    }
-
-    #[test]
-    fn test_parse_and_add() {
-        let mut engine = PrologEngine::new();
-        
-        engine.parse_and_add("parent(tom, bob).").unwrap();
-        engine.parse_and_add("parent(bob, ann).").unwrap();
-        
-        assert_eq!(engine.clauses.len(), 2);
-    }
-
-    #[test]
-    fn test_parse_error() {
-        let mut engine = PrologEngine::new();
-        
-        let result = engine.parse_and_add("invalid syntax");
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_simple_query() {
-        let mut engine = PrologEngine::new();
-        
-        engine.parse_and_add("parent(tom, bob).").unwrap();
-        engine.parse_and_add("parent(bob, ann).").unwrap();
-        
-        let solutions = engine.parse_query("parent(tom, bob).").unwrap();
-        assert_eq!(solutions.len(), 1);
-        
-        let solutions = engine.parse_query("parent(tom, X).").unwrap();
-        assert_eq!(solutions.len(), 1);
-        
-        let solutions = engine.parse_query("parent(mary, X).").unwrap();
-        assert_eq!(solutions.len(), 0);
-    }
-
-    #[test]
-    fn test_variable_query() {
-        let mut engine = PrologEngine::new();
-        
-        engine.parse_and_add("likes(mary, food).").unwrap();
-        engine.parse_and_add("likes(mary, wine).").unwrap();
-        engine.parse_and_add("likes(john, wine).").unwrap();
-        
-        let solutions = engine.parse_query("likes(mary, X).").unwrap();
-        assert_eq!(solutions.len(), 2);
-        
-        let solutions = engine.parse_query("likes(X, wine).").unwrap();
-        assert_eq!(solutions.len(), 2);
-    }
-
-    #[test]
-    fn test_rule_execution() {
-        let mut engine = PrologEngine::new();
-        
-        engine.parse_and_add("parent(alice, bob).").unwrap();
-        engine.parse_and_add("parent(bob, charlie).").unwrap();
-        engine.parse_and_add("grandparent(X, Z) :- parent(X, Y), parent(Y, Z).").unwrap();
-        
-        let solutions = engine.parse_query("grandparent(alice, charlie).").unwrap();
-        assert_eq!(solutions.len(), 1);
-        
-        let solutions = engine.parse_query("grandparent(alice, X).").unwrap();
-        assert_eq!(solutions.len(), 1);
-    }
-
-    #[test]
-    fn test_arithmetic() {
-        let mut engine = PrologEngine::new();
-        
-        let solutions = engine.parse_query("X is 2 + 3.").unwrap();
-        assert_eq!(solutions.len(), 1);
-        
-        let solutions = engine.parse_query("5 > 3.").unwrap();
-        assert_eq!(solutions.len(), 1);
-        
-        let solutions = engine.parse_query("3 > 5.").unwrap();
-        assert_eq!(solutions.len(), 0);
-    }
-
-    #[test]
-    fn test_list_operations() {
-        let mut engine = PrologEngine::new();
-        
-        let solutions = engine.parse_query("append([1, 2], [3, 4], X).").unwrap();
-        assert_eq!(solutions.len(), 1);
-        
-        let solutions = engine.parse_query("member(2, [1, 2, 3]).").unwrap();
-        assert_eq!(solutions.len(), 1);
-        
-        let solutions = engine.parse_query("length([a, b, c], X).").unwrap();
-        assert_eq!(solutions.len(), 1);
-    }
-
-    #[test]
-    fn test_cut_operation() {
-        let mut engine = PrologEngine::new();
-        
-        engine.parse_and_add("max(X, Y, X) :- X >= Y, !.").unwrap();
-        engine.parse_and_add("max(X, Y, Y).").unwrap();
-        
-        let solutions = engine.parse_query("max(5, 3, Z).").unwrap();
-        assert_eq!(solutions.len(), 1); // Cut should prevent second clause
-    }
-
-    #[test]
-    fn test_engine_stats() {
-        let mut engine = PrologEngine::new();
-        
-        engine.parse_and_add("fact1(a).").unwrap();
-        engine.parse_and_add("fact1(b).").unwrap();
-        engine.parse_and_add("fact2(x).").unwrap();
-        
-        let stats = engine.get_stats();
-        assert_eq!(stats.clause_count, 3);
-        assert_eq!(stats.predicate_count(), 2); // fact1/1 and fact2/1
-        
-        // Test query counting
-        engine.parse_query("fact1(a).").unwrap();
-        assert_eq!(engine.get_stats().queries_executed, 1);
-    }
-
-    #[test]
-    fn test_predicate_finding() {
-        let mut engine = PrologEngine::new();
-        
-        engine.parse_and_add("parent(tom, bob).").unwrap();
-        engine.parse_and_add("parent(bob, ann).").unwrap();
-        engine.parse_and_add("likes(mary, wine).").unwrap();
-        
-        let parent_clauses = engine.find_clauses("parent", 2);
-        assert_eq!(parent_clauses.len(), 2);
-        
-        let likes_clauses = engine.find_clauses("likes", 2);
-        assert_eq!(likes_clauses.len(), 1);
-        
-        let unknown_clauses = engine.find_clauses("unknown", 1);
-        assert_eq!(unknown_clauses.len(), 0);
-        
-        assert!(engine.is_predicate_defined("parent", 2));
-        assert!(engine.is_predicate_defined("append", 3)); // Built-in
-        assert!(!engine.is_predicate_defined("unknown", 1));
-    }
-
-    #[test]
-    fn test_database_export_import() {
-        let mut engine = PrologEngine::new();
-        
-        engine.parse_and_add("parent(tom, bob).").unwrap();
-        engine.parse_and_add("parent(bob, ann).").unwrap();
-        engine.parse_and_add("grandparent(X, Z) :- parent(X, Y), parent(Y, Z).").unwrap();
-        
-        let exported = engine.export_database();
-        assert!(exported.contains("parent(tom, bob)"));
-        assert!(exported.contains("grandparent"));
-        
-        let mut new_engine = PrologEngine::new();
-        let errors = new_engine.load_database(&exported);
-        assert!(errors.is_empty());
-        assert_eq!(new_engine.clauses.len(), 3);
-    }
-
-    #[test]
-    fn test_error_handling() {
-        let mut engine = PrologEngine::new();
-        
-        // Test division by zero
-        let result = engine.parse_query("X is 5 // 0.");
-        assert!(result.is_err());
-        
-        // Test uninstantiated variable
-        let result = engine.parse_query("X is Y + 1.");
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_solution_limits() {
-        let mut engine = PrologEngine::with_limits(3);
-        
-        // Add many facts
-        for i in 1..=10 {
-            engine.parse_and_add(&format!("number({}).", i)).unwrap();
-        }
-        
-        let result = engine.parse_query("number(X).");
-        
-        // Should either succeed with limited solutions or fail with limit error
-        match result {
-            Ok(solutions) => assert!(solutions.len() <= 3),
-            Err(_) => {} // Limit error is acceptable
-        }
-    }
-
-    #[test]
-    fn test_stack_overflow_protection() {
-        let mut engine = PrologEngine::with_config(10, 5); // Very low limits
-        
-        engine.parse_and_add("infinite(X) :- infinite(X).").unwrap();
-        
-        let result = engine.parse_query("infinite(test).");
-        assert!(result.is_err());
-        
-        // Should be a stack overflow error
-        if let Err(e) = result {
-            let error_msg = format!("{}", e);
-            assert!(error_msg.contains("Stack overflow") || error_msg.contains("overflow"));
-        }
-    }
-
-    #[test]
-    fn test_variable_renaming() {
-        let mut engine = PrologEngine::new();
-        
-        engine.parse_and_add("test(X) :- X = 1.").unwrap();
-        engine.parse_and_add("test(X) :- X = 2.").unwrap();
-        
-        let solutions = engine.parse_query("test(Y).").unwrap();
-        assert_eq!(solutions.len(), 2);
-        
-        // Extract the values that Y is bound to - FIXED VERSION
-        let mut values = Vec::new();
-        
-        for solution in &solutions {
-            // Find what Y resolves to - follow the substitution chain
-            if let Some(term) = solution.get("Y") {
-                let final_value = Unifier::apply_substitution(term, solution);
-                if let Term::Number(n) = final_value {
-                    values.push(n);
-                }
-            }
-        }
-        
-        // Sort values to ensure consistent comparison
-        values.sort();
-        assert_eq!(values, vec![1, 2], 
-                  "Expected Y to be bound to values [1, 2], found: {:?}", values);
-    }
-
-    #[test]
-    fn test_complex_unification() {
-        let mut engine = PrologEngine::new();
-        
-        engine.parse_and_add("complex(f(X, Y), f(a, b)) :- X = a, Y = b.").unwrap();
-        
-        let solutions = engine.parse_query("complex(f(a, b), Z).").unwrap();
-        assert_eq!(solutions.len(), 1);
-        
-        // Test unification failure
-        let solutions = engine.parse_query("complex(f(c, d), f(a, b)).").unwrap();
-        assert_eq!(solutions.len(), 0);
-    }
-
-    #[test]
-    fn test_list_predicates() {
-        let mut engine = PrologEngine::new();
-        
-        engine.parse_and_add("parent(tom, bob).").unwrap();
-        engine.parse_and_add("parent(bob, ann).").unwrap();
-        engine.parse_and_add("likes(mary, wine).").unwrap();
-        
-        let predicates = engine.list_predicates();
-        assert_eq!(predicates.len(), 2); // parent/2 and likes/2
-        
-        let builtins = engine.list_builtins();
-        assert!(!builtins.is_empty());
-        
-        // Check that some expected built-ins are there
-        let builtin_names: Vec<&String> = builtins.iter().map(|(name, _, _)| name).collect();
-        assert!(builtin_names.contains(&&"append".to_string()));
-        assert!(builtin_names.contains(&&"is".to_string()));
-    }
-
-    #[test]
-    fn test_execution_context() {
-        let mut context = ExecutionContext::new();
-        
-        assert_eq!(context.get_stack_depth(), 0);
-        assert!(!context.is_cut_called());
-        
-        context.enter_predicate("test/1".to_string()).unwrap();
-        assert_eq!(context.get_stack_depth(), 1);
-        assert_eq!(context.get_current_predicate(), "test/1");
-        
-        context.cut();
-        assert!(context.is_cut_called());
-        
-        context.reset_cut();
-        assert!(!context.is_cut_called());
-        
-        context.exit_predicate();
-        assert_eq!(context.get_stack_depth(), 0);
-    }
-
-    #[test]
-    fn test_context_stack_overflow() {
-        let mut context = ExecutionContext::with_max_depth(2);
-        
-        context.enter_predicate("pred1".to_string()).unwrap();
-        context.enter_predicate("pred2".to_string()).unwrap();
-        
-        let result = context.enter_predicate("pred3".to_string());
-        assert!(result.is_err());
-        
-        if let Err(RuntimeError::StackOverflow { depth, predicate }) = result {
-            assert_eq!(depth, 3);
-            assert_eq!(predicate, "pred3");
-        } else {
-            panic!("Expected StackOverflow error");
-        }
-    }
-
-    #[test]
-    fn test_engine_configuration() {
-        let mut engine = PrologEngine::with_config(50, 200);
-        
-        assert_eq!(engine.max_solutions, 50);
-        assert_eq!(engine.get_stats().max_stack_depth, 200);
-        
-        engine.set_max_solutions(75);
-        engine.set_max_stack_depth(150);
-        
-        assert_eq!(engine.max_solutions, 75);
-        assert_eq!(engine.get_stats().max_stack_depth, 150);
-    }
-
-    #[test]
-    fn test_stats_tracking() {
-        let mut engine = PrologEngine::new();
-        
-        // Add clauses and track stats
-        engine.parse_and_add("fact(a).").unwrap();
-        engine.parse_and_add("fact(b).").unwrap();
-        engine.parse_and_add("rule(X) :- fact(X).").unwrap();
-        
-        let stats = engine.get_stats();
-        assert_eq!(stats.clause_count, 3);
-        assert_eq!(stats.predicate_count(), 2); // fact/1 and rule/1
-        
-        if let Some((pred, count)) = stats.most_common_predicate() {
-            assert_eq!(pred, "fact/1");
-            assert_eq!(count, 2);
-        }
-        
-        // Test query tracking
-        engine.parse_query("fact(a).").unwrap();
-        engine.parse_query("rule(X).").unwrap();
-        
-        assert_eq!(engine.get_stats().queries_executed, 2);
-    }
-
-    #[test]
-    fn test_clear_database() {
-        let mut engine = PrologEngine::new();
-        
-        engine.parse_and_add("fact(a).").unwrap();
-        engine.parse_and_add("fact(b).").unwrap();
-        
-        assert_eq!(engine.clauses.len(), 2);
-        assert_eq!(engine.get_stats().clause_count, 2);
-        
-        engine.clear();
-        
-        assert_eq!(engine.clauses.len(), 0);
-        assert_eq!(engine.get_stats().clause_count, 0);
-        assert_eq!(engine.get_stats().predicate_count(), 0);
-    }
-
-    #[test]
-    fn test_reset_stats() {
-        let mut engine = PrologEngine::new();
-        
-        engine.parse_and_add("fact(a).").unwrap();
-        engine.parse_query("fact(a).").unwrap();
-        
-        assert_eq!(engine.get_stats().queries_executed, 1);
-        
-        engine.reset_stats();
-        
-        assert_eq!(engine.get_stats().queries_executed, 0);
-        assert_eq!(engine.get_stats().clause_count, 1); // Clauses still there
-    }
-}
+#[path = "engine_tests.rs"]
+mod tests;
