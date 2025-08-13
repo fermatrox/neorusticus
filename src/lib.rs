@@ -100,7 +100,7 @@ pub fn parse_term(input: &str) -> ParseResult<Term> {
     // a hierarchical AST structure from them
     let mut parser = parser::Parser::new(tokens);
     
-    // Step 4: Parse the tokens into a Term
+    // Step 4: Parse the tokens into a Term.
     // This is the actual parsing - converting tokens into
     // a structured Term that represents the Prolog syntax
     // The parser handles operator precedence, list syntax,
