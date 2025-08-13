@@ -151,7 +151,19 @@ pub fn quick_query(clauses: &[&str], query: &str) -> Result<Vec<Substitution>, B
         engine.parse_and_add(clause)?;
     }
     
-    // Step 3: Execute the query against the populated database
+    // Step 3: Ensure the query has proper terminator
+    // Queries MUST end with '?' not '.'
+    let query_str = if query.ends_with('?') {
+        query.to_string()
+    } else if query.ends_with('.') {
+        // Wrong terminator for a query - let engine produce proper error
+        query.to_string()
+    } else {
+        // Add question mark if missing
+        format!("{}?", query)
+    };
+    
+    // Step 4: Execute the query against the populated database
     // parse_query handles:
     // 1. Tokenizing the query string
     // 2. Parsing it into a list of goals (Terms)
@@ -163,7 +175,7 @@ pub fn quick_query(clauses: &[&str], query: &str) -> Result<Vec<Substitution>, B
     // - Built-in predicates when applicable
     // The result is a vector of Substitutions, where each
     // Substitution is a HashMap mapping variable names to Terms
-    engine.parse_query(query)
+    engine.parse_query(&query_str)
 }
 
 // Link to the test module

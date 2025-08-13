@@ -72,19 +72,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             complete_input.push_str(continuation.trim());
         }
         
-        if complete_input.ends_with('?') {
+        //if complete_input.ends_with('?') {
+        //    // Query
+        //    let query_input = complete_input.trim_end_matches('?').to_string() + ".";
+        //    handle_query(&mut engine, &query_input);
+        //} else if complete_input.ends_with('.') {
+        //    // Check if it's a query or a clause
+        //    if looks_like_query(&complete_input) {
+        //        handle_query(&mut engine, &complete_input);
+        //    } else {
+        //        handle_clause(&mut engine, &complete_input);
+        //    }
+        //} else {
+        //    println!("Error: Input must end with '.' or '?'");
+        //}
+		
+		if complete_input.ends_with('?') {
             // Query
-            let query_input = complete_input.trim_end_matches('?').to_string() + ".";
-            handle_query(&mut engine, &query_input);
-        } else if complete_input.ends_with('.') {
-            // Check if it's a query or a clause
-            if looks_like_query(&complete_input) {
-                handle_query(&mut engine, &complete_input);
-            } else {
-                handle_clause(&mut engine, &complete_input);
-            }
+            handle_query(&mut engine, &complete_input);
+		} else if complete_input.ends_with('.') {
+            handle_clause(&mut engine, &complete_input);
         } else {
-            println!("Error: Input must end with '.' or '?'");
+            println!("Error: Query must end with '?'");
         }
     }
     
@@ -111,34 +120,7 @@ fn print_help() {
     println!("  Control: true/0, fail/0, !/0 (cut)");
 }
 
-fn looks_like_query(input: &str) -> bool {
-    // Simple heuristic: if it doesn't contain :-, it's probably a query
-    // But we need to be more careful - facts like "parent(tom, bob)." should NOT be queries
-    
-    if input.contains(":-") {
-        // Definitely a rule, not a query
-        return false;
-    }
-    
-    // Check for common query patterns:
-    // - Contains variables in significant positions
-    // - Looks like it's asking for information rather than stating a fact
-    
-    // For now, let's be conservative: assume everything without :- is a fact/clause
-    // unless it contains obvious query indicators
-    
-    // Check if it contains unbound variables (common in queries)
-    let has_variables = input.chars()
-        .any(|c| c.is_ascii_uppercase() && c != 'A' && c != 'I'); // Avoid common atom starts
-        
-    // If it has variables and no specific facts (like quoted atoms), might be a query
-    // But "parent(tom, bob)" has no variables, so it's clearly a fact
-    
-    // Better heuristic: only treat as query if it has variables or is asking something
-    has_variables && !input.trim_end_matches('.').contains('(') || 
-    input.trim().starts_with("?-") ||
-    input.contains("=") && has_variables // Unification queries
-}
+
 
 fn handle_clause(engine: &mut PrologEngine, input: &str) {
     println!("Adding clause: {}", input.trim());

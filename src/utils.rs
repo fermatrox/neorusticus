@@ -693,11 +693,16 @@ impl EngineUtils {
         
         for query in queries {
             // Ensure query ends with proper terminator
-            let query_str = if query.ends_with('.') || query.ends_with('?') {
+            // Queries MUST end with '?' not '.'
+            let query_str = if query.ends_with('?') {
+                query.to_string()
+            } else if query.ends_with('.') {
+                // Query has wrong terminator - still try it but it will likely fail
+                // Let the engine produce the proper error message
                 query.to_string()
             } else {
-                // Add period if missing
-                format!("{}.", query)
+                // Add question mark if missing (queries use ?, not .)
+                format!("{}?", query)
             };
             
             // Execute query and convert result to standardized format
