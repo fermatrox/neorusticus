@@ -1,6 +1,6 @@
 [package]
 name = "neorusticus"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 authors = ["jonas.p.forsman@gmail.com"]
 description = "A Prolog implementation in Rust with enhanced error handling"
@@ -16,6 +16,9 @@ exclude = [
     "stuff/",
 	".github/",
     ".copyright_header_to_rs",
+	"cargo-merge.exe",
+	"src_vault/",
+	]
 
 [lib]
 name = "neorusticus"

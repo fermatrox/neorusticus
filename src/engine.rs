@@ -268,13 +268,23 @@ impl PrologEngine {
             e
         })?;
         
-        // Step 4: Update statistics with the new predicate information
+        // Step 4: Validate the clause
+        // Facts (clauses with no body) must be ground (no variables)
+        if clause.is_fact() && !clause.is_ground() {
+            return Err(ParseError::InvalidSyntax {
+                message: format!("Facts cannot contain variables. Found variables in: {}", clause.head),
+                position: crate::error::Position::start(),
+                suggestion: Some("Either provide concrete values for all variables, or make it a rule with a body".to_string()),
+            });
+        }
+        
+        // Step 5: Update statistics with the new predicate information
         // This tracks what predicates are defined and how many clauses each has
         if let Some((functor, arity)) = clause.head_functor_arity() {
             self.stats.add_predicate(functor, arity);
         }
         
-        // Step 5: Add the parsed clause to the database
+        // Step 6: Add the parsed clause to the database
         self.add_clause(clause);
         Ok(())
     }
@@ -325,6 +335,7 @@ impl PrologEngine {
     }
     
     /// Add a fact (clause with no body)
+    /// Facts must be ground (contain no variables)
     pub fn add_fact(&mut self, head: Term) {
         // Create a fact from the head term
         let clause = Clause::fact(head);

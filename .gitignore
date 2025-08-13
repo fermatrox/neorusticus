@@ -1,4 +1,6 @@
 /target
 /branding
 /stuff
+/src_vault
+/cargo-merge.exe
 .copyright_header_to_rs
