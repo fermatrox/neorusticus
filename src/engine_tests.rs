@@ -466,17 +466,17 @@ fn test_simple_query() {
     engine.parse_and_add("parent(tom, bob).").unwrap();
     engine.parse_and_add("parent(bob, ann).").unwrap();
     
-    // Query 1: parent(tom, bob) - should succeed (exact match)
-    let solutions = engine.parse_query("parent(tom, bob).").unwrap();
+    // Query 1: parent(tom, bob)? - should succeed (exact match)
+    let solutions = engine.parse_query("parent(tom, bob)?").unwrap();
     assert_eq!(solutions.len(), 1);  // One solution (true)
     
-    // Query 2: parent(tom, X) - should find X = bob
-    let solutions = engine.parse_query("parent(tom, X).").unwrap();
+    // Query 2: parent(tom, X)? - should find X = bob
+    let solutions = engine.parse_query("parent(tom, X)?").unwrap();
     assert_eq!(solutions.len(), 1);  // One solution
     // The solution should bind X to bob
     
-    // Query 3: parent(mary, X) - should fail (no match)
-    let solutions = engine.parse_query("parent(mary, X).").unwrap();
+    // Query 3: parent(mary, X)? - should fail (no match)
+    let solutions = engine.parse_query("parent(mary, X)?").unwrap();
     assert_eq!(solutions.len(), 0);  // No solutions
 }
 
@@ -492,12 +492,12 @@ fn test_variable_query() {
     engine.parse_and_add("likes(mary, wine).").unwrap();
     engine.parse_and_add("likes(john, wine).").unwrap();
     
-    // Query: likes(mary, X) - should find all things mary likes
-    let solutions = engine.parse_query("likes(mary, X).").unwrap();
+    // Query: likes(mary, X)? - should find all things mary likes
+    let solutions = engine.parse_query("likes(mary, X)?").unwrap();
     assert_eq!(solutions.len(), 2);  // Two things: food and wine
     
-    // Query: likes(X, wine) - should find all who like wine
-    let solutions = engine.parse_query("likes(X, wine).").unwrap();
+    // Query: likes(X, wine)? - should find all who like wine
+    let solutions = engine.parse_query("likes(X, wine)?").unwrap();
     assert_eq!(solutions.len(), 2);  // Two people: mary and john
 }
 
@@ -515,12 +515,12 @@ fn test_rule_execution() {
     // Add rule: grandparent(X, Z) :- parent(X, Y), parent(Y, Z)
     engine.parse_and_add("grandparent(X, Z) :- parent(X, Y), parent(Y, Z).").unwrap();
     
-    // Query: grandparent(alice, charlie) - should succeed via the rule
-    let solutions = engine.parse_query("grandparent(alice, charlie).").unwrap();
+    // Query: grandparent(alice, charlie)? - should succeed via the rule
+    let solutions = engine.parse_query("grandparent(alice, charlie)?").unwrap();
     assert_eq!(solutions.len(), 1);  // Alice is Charlie's grandparent
     
-    // Query: grandparent(alice, X) - should find X = charlie
-    let solutions = engine.parse_query("grandparent(alice, X).").unwrap();
+    // Query: grandparent(alice, X)? - should find X = charlie
+    let solutions = engine.parse_query("grandparent(alice, X)?").unwrap();
     assert_eq!(solutions.len(), 1);
 }
 
@@ -532,15 +532,15 @@ fn test_arithmetic() {
     let mut engine = PrologEngine::new();
     
     // Test arithmetic evaluation: X is 2 + 3
-    let solutions = engine.parse_query("X is 2 + 3.").unwrap();
+    let solutions = engine.parse_query("X is 2 + 3?").unwrap();
     assert_eq!(solutions.len(), 1);  // X should be bound to 5
     
     // Test comparison: 5 > 3 (should succeed)
-    let solutions = engine.parse_query("5 > 3.").unwrap();
+    let solutions = engine.parse_query("5 > 3?").unwrap();
     assert_eq!(solutions.len(), 1);  // True
     
     // Test comparison: 3 > 5 (should fail)
-    let solutions = engine.parse_query("3 > 5.").unwrap();
+    let solutions = engine.parse_query("3 > 5?").unwrap();
     assert_eq!(solutions.len(), 0);  // False
 }
 
@@ -551,16 +551,16 @@ fn test_list_operations() {
     
     let mut engine = PrologEngine::new();
     
-    // Test append: append([1, 2], [3, 4], X)
-    let solutions = engine.parse_query("append([1, 2], [3, 4], X).").unwrap();
+    // Test append: append([1, 2], [3, 4], X)?
+    let solutions = engine.parse_query("append([1, 2], [3, 4], X)?").unwrap();
     assert_eq!(solutions.len(), 1);  // X = [1, 2, 3, 4]
     
-    // Test member: member(2, [1, 2, 3])
-    let solutions = engine.parse_query("member(2, [1, 2, 3]).").unwrap();
+    // Test member: member(2, [1, 2, 3])?
+    let solutions = engine.parse_query("member(2, [1, 2, 3])?").unwrap();
     assert_eq!(solutions.len(), 1);  // 2 is a member
     
-    // Test length: length([a, b, c], X)
-    let solutions = engine.parse_query("length([a, b, c], X).").unwrap();
+    // Test length: length([a, b, c], X)?
+    let solutions = engine.parse_query("length([a, b, c], X)?").unwrap();
     assert_eq!(solutions.len(), 1);  // X = 3
 }
 
@@ -577,8 +577,8 @@ fn test_cut_operation() {
     engine.parse_and_add("max(X, Y, X) :- X >= Y, !.").unwrap();
     engine.parse_and_add("max(X, Y, Y).").unwrap();
     
-    // Query: max(5, 3, Z)
-    let solutions = engine.parse_query("max(5, 3, Z).").unwrap();
+    // Query: max(5, 3, Z)?
+    let solutions = engine.parse_query("max(5, 3, Z)?").unwrap();
     assert_eq!(solutions.len(), 1); // Cut should prevent second clause from being tried
     // Without cut, we might get two solutions (Z=5 and Z=3)
 }
@@ -599,7 +599,7 @@ fn test_engine_stats() {
     assert_eq!(stats.predicate_count(), 2); // 2 unique predicates: fact1/1 and fact2/1
     
     // Test query counting
-    engine.parse_query("fact1(a).").unwrap();
+    engine.parse_query("fact1(a)?").unwrap();
     assert_eq!(engine.get_stats().queries_executed, 1);
 }
 
@@ -664,12 +664,12 @@ fn test_error_handling() {
     let mut engine = PrologEngine::new();
     
     // Test division by zero
-    let result = engine.parse_query("X is 5 // 0.");
+    let result = engine.parse_query("X is 5 // 0?");
     assert!(result.is_err());  // Should error
     
     // Test uninstantiated variable in arithmetic
     // Y is unbound, so Y + 1 can't be evaluated
-    let result = engine.parse_query("X is Y + 1.");
+    let result = engine.parse_query("X is Y + 1?");
     assert!(result.is_err());  // Should error
 }
 
@@ -686,7 +686,7 @@ fn test_solution_limits() {
     }
     
     // Query that would find 10 solutions
-    let result = engine.parse_query("number(X).");
+    let result = engine.parse_query("number(X)?");
     
     // Should either succeed with limited solutions or fail with limit error
     match result {
@@ -706,7 +706,7 @@ fn test_stack_overflow_protection() {
     engine.parse_and_add("infinite(X) :- infinite(X).").unwrap();
     
     // Query should hit stack overflow
-    let result = engine.parse_query("infinite(test).");
+    let result = engine.parse_query("infinite(test)?");
     assert!(result.is_err());
     
     // Should be a stack overflow error
@@ -729,7 +729,7 @@ fn test_variable_renaming() {
     engine.parse_and_add("test(X) :- X = 2.").unwrap();
     
     // Query with variable Y (different from X in clauses)
-    let solutions = engine.parse_query("test(Y).").unwrap();
+    let solutions = engine.parse_query("test(Y)?").unwrap();
     assert_eq!(solutions.len(), 2);  // Should find both solutions
     
     // Extract the values that Y is bound to
@@ -762,11 +762,11 @@ fn test_complex_unification() {
     engine.parse_and_add("complex(f(X, Y), f(a, b)) :- X = a, Y = b.").unwrap();
     
     // Query with matching structure
-    let solutions = engine.parse_query("complex(f(a, b), Z).").unwrap();
+    let solutions = engine.parse_query("complex(f(a, b), Z)?").unwrap();
     assert_eq!(solutions.len(), 1);  // Should succeed
     
-    // Test unification failure with non-matching structure
-    let solutions = engine.parse_query("complex(f(c, d), f(a, b)).").unwrap();
+    // Test that non-unifiable terms fail
+    let solutions = engine.parse_query("complex(f(c, d), f(a, b))?").unwrap();
     assert_eq!(solutions.len(), 0);  // Should fail (c != a, d != b)
 }
 
@@ -825,7 +825,7 @@ fn test_reset_stats() {
     
     // Add a clause and execute a query
     engine.parse_and_add("fact(a).").unwrap();
-    engine.parse_query("fact(a).").unwrap();
+    engine.parse_query("fact(a)?").unwrap();
     
     assert_eq!(engine.get_stats().queries_executed, 1);
     
@@ -863,14 +863,14 @@ fn test_engine_edge_cases() {
     
     // Test with empty clause database
     // Should return no solutions but not error
-    let solutions = engine.parse_query("unknown(X).").unwrap();
+    let solutions = engine.parse_query("unknown(X)?").unwrap();
     assert_eq!(solutions.len(), 0);
     
     // Test with max_solutions = 0
     // Should immediately hit the limit
     engine.set_max_solutions(0);
     engine.parse_and_add("fact(a).").unwrap();
-    let result = engine.parse_query("fact(X).");
+    let result = engine.parse_query("fact(X)?");
     assert!(result.is_err()); // Should hit solution limit immediately
     
     // Test load_database with invalid input
@@ -899,7 +899,7 @@ fn test_circular_reference_handling() {
     engine.parse_and_add("loop(X) :- loop(X).").unwrap();
     
     // Should not cause infinite loop due to stack protection
-    let result = engine.parse_query("loop(test).");
+    let result = engine.parse_query("loop(test)?");
     assert!(result.is_err());  // Should error due to stack overflow
 }
 
@@ -1035,7 +1035,7 @@ fn test_multiple_solutions_with_limits() {
     engine.parse_and_add("choice(2).").unwrap();
     engine.parse_and_add("choice(3).").unwrap();
     
-    let result = engine.parse_query("choice(X).");
+    let result = engine.parse_query("choice(X)?");
     
     match result {
         Ok(solutions) => {
@@ -1051,8 +1051,8 @@ fn test_multiple_solutions_with_limits() {
 
 #[test]
 fn test_query_with_question_mark() {
-    // Tests that queries can end with either ? or .
-    // Different Prolog systems use different conventions.
+    // Tests that queries must end with ?
+    // According to our rules: queries ALWAYS end with ?
     
     let mut engine = PrologEngine::new();
     
@@ -1062,9 +1062,9 @@ fn test_query_with_question_mark() {
     let result1 = engine.parse_query("fact(a)?");
     assert!(result1.is_ok());
     
-    // Test that query can end with .
+    // Test that query with . should fail (queries must use ?)
     let result2 = engine.parse_query("fact(a).");
-    assert!(result2.is_ok());
+    assert!(result2.is_err()); // Should error because queries must use ?
 }
 
 #[test]

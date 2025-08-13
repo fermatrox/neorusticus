@@ -55,7 +55,7 @@ fn test_arithmetic_errors() {
     let mut engine = PrologEngine::new();
     
     // Test division by zero
-    let result = engine.parse_query("X is 5 // 0.");
+    let result = engine.parse_query("X is 5 // 0?");
     assert!(result.is_err());
     if let Err(e) = result {
         let error_msg = format!("{}", e);
@@ -63,7 +63,7 @@ fn test_arithmetic_errors() {
     }
     
     // Test uninstantiated variable in arithmetic
-    let result = engine.parse_query("X is Y + 1.");
+    let result = engine.parse_query("X is Y + 1?");
     assert!(result.is_err());
     if let Err(e) = result {
         let error_msg = format!("{}", e);
@@ -71,7 +71,7 @@ fn test_arithmetic_errors() {
     }
     
     // Test type mismatch in arithmetic
-    let result = engine.parse_query("X is atom + 1.");
+    let result = engine.parse_query("X is atom + 1?");
     assert!(result.is_err());
     if let Err(e) = result {
         let error_msg = format!("{}", e);
@@ -80,7 +80,7 @@ fn test_arithmetic_errors() {
     
     // Test integer overflow
     engine.parse_and_add("big_num(999999999).").unwrap();
-    let _result = engine.parse_query("big_num(X), Y is X * X * X * X.");
+    let _result = engine.parse_query("big_num(X), Y is X * X * X * X?");
     // This might succeed or fail depending on implementation limits
     // The important thing is it doesn't crash
 }
@@ -90,7 +90,7 @@ fn test_list_errors() {
     let mut engine = PrologEngine::new();
     
     // Test member/2 with ground atom (should succeed if atom is in list, fail if not)
-    let result = engine.parse_query("member(not_in_list, [1, 2, 3]).");
+    let result = engine.parse_query("member(not_in_list, [1, 2, 3])?");
     // This should succeed (no error) but return 0 solutions
     match result {
         Ok(solutions) => assert_eq!(solutions.len(), 0),
@@ -101,23 +101,23 @@ fn test_list_errors() {
     // Even if they don't error, they should handle edge cases gracefully
     
     // Test length/2 with various inputs
-    let _result1 = engine.parse_query("length([], 0).");
-    let _result2 = engine.parse_query("length([1, 2, 3], 3).");
-    let _result3 = engine.parse_query("length([1, 2], 3).");
+    let _result1 = engine.parse_query("length([], 0)?");
+    let _result2 = engine.parse_query("length([1, 2, 3], 3)?");
+    let _result3 = engine.parse_query("length([1, 2], 3)?");
     
     // Test append/3 with various inputs  
-    let _result4 = engine.parse_query("append([], [1, 2], [1, 2]).");
-    let _result5 = engine.parse_query("append([1], [2], [1, 2]).");
+    let _result4 = engine.parse_query("append([], [1, 2], [1, 2])?");
+    let _result5 = engine.parse_query("append([1], [2], [1, 2])?");
     
     // Test member/2 with various inputs
-    let _result6 = engine.parse_query("member(1, [1, 2, 3]).");
-    let _result7 = engine.parse_query("member(4, [1, 2, 3]).");
+    let _result6 = engine.parse_query("member(1, [1, 2, 3])?");
+    let _result7 = engine.parse_query("member(4, [1, 2, 3])?");
     
     // The main thing we're testing is that these don't crash the engine
     // Specific error behavior can vary between implementations
     
     // Test one case that should definitely error: arithmetic with non-numbers
-    let result = engine.parse_query("X is atom + 1.");
+    let result = engine.parse_query("X is atom + 1?");
     assert!(result.is_err());
     if let Err(e) = result {
         let error_msg = format!("{}", e);
@@ -134,11 +134,11 @@ fn test_predicate_suggestions() {
     
     // Test that undefined predicates either error or return 0 solutions
     let undefined_queries = vec![
-        "lengthh([1, 2, 3], X).",
-        "appnd([1], [2], X).", 
-        "totally_fake_predicate_xyz(X).",
-        "nonexistent(A, B, C).",
-        "made_up_predicate().",
+        "lengthh([1, 2, 3], X)?",
+        "appnd([1], [2], X)?", 
+        "totally_fake_predicate_xyz(X)?",
+        "nonexistent(A, B, C)?",
+        "made_up_predicate()?",
     ];
     
     for query in undefined_queries {
@@ -156,16 +156,16 @@ fn test_predicate_suggestions() {
     }
     
     // Test that known predicates work correctly
-    let result = engine.parse_query("append([1], [2], X).");
+    let result = engine.parse_query("append([1], [2], X)?");
     assert!(result.is_ok(), "Known predicate append/3 should work");
     
     let solutions = result.unwrap();
     assert_eq!(solutions.len(), 1, "append/3 should find exactly one solution");
     
     // Test that the engine doesn't crash with various predicate calls
-    let _result1 = engine.parse_query("unknown_pred().");
-    let _result2 = engine.parse_query("fake(a, b, c, d, e).");
-    let _result3 = engine.parse_query("xyz123().");
+    let _result1 = engine.parse_query("unknown_pred()?");
+    let _result2 = engine.parse_query("fake(a, b, c, d, e)?");
+    let _result3 = engine.parse_query("xyz123()?");
     
     // The main thing is that these don't crash the engine
     // Specific error vs empty result behavior can vary
@@ -181,7 +181,7 @@ fn test_stack_overflow_protection() {
     engine.parse_and_add("infinite(X) :- infinite(X).").unwrap();
     
     // Test that it catches infinite recursion
-    let result = engine.parse_query("infinite(test).");
+    let result = engine.parse_query("infinite(test)?");
     assert!(result.is_err());
     if let Err(e) = result {
         let error_msg = format!("{}", e);
@@ -195,7 +195,7 @@ fn test_cut_errors() {
     
     // Cut should work in rule bodies
     engine.parse_and_add("test_cut :- !, true.").unwrap();
-    let result = engine.parse_query("test_cut.");
+    let result = engine.parse_query("test_cut?");
     assert!(result.is_ok());
     
     // Test that the engine handles cut properly in various contexts
@@ -203,7 +203,7 @@ fn test_cut_errors() {
     engine.parse_and_add("choice(2).").unwrap();
     engine.parse_and_add("no_choice(X) :- choice(X), !.").unwrap();
     
-    let solutions = engine.parse_query("no_choice(Y).").unwrap();
+    let solutions = engine.parse_query("no_choice(Y)?").unwrap();
     assert_eq!(solutions.len(), 1); // Cut should prevent backtracking
 }
 
@@ -212,7 +212,7 @@ fn test_unification_errors() {
     let mut engine = PrologEngine::new();
     
     // Test occurs check (if implemented)
-    let result = engine.parse_query("X = f(X).");
+    let result = engine.parse_query("X = f(X)?");
     // This should either succeed (if occurs check is disabled) or fail gracefully
     // The important thing is it doesn't crash
     match result {
@@ -226,7 +226,7 @@ fn test_unification_errors() {
     }
     
     // Test complex unification failure
-    let result = engine.parse_query("f(a, b) = f(c, d).");
+    let result = engine.parse_query("f(a, b) = f(c, d)?");
     assert!(result.is_ok());
     let solutions = result.unwrap();
     assert_eq!(solutions.len(), 0); // Should fail to unify
@@ -240,7 +240,7 @@ fn test_variable_scoping() {
     engine.parse_and_add("test(X) :- X = 1.").unwrap();
     engine.parse_and_add("test(X) :- X = 2.").unwrap();
     
-    let solutions = engine.parse_query("test(Y).").unwrap();
+    let solutions = engine.parse_query("test(Y)?").unwrap();
     assert_eq!(solutions.len(), 2);
 }
 
@@ -256,15 +256,15 @@ fn test_error_recovery() {
     assert!(result.is_err());
     
     // Engine should still work for valid queries
-    let solutions = engine.parse_query("parent(tom, X).").unwrap();
+    let solutions = engine.parse_query("parent(tom, X)?").unwrap();
     assert_eq!(solutions.len(), 1);
     
     // Try another invalid query
-    let result = engine.parse_query("X is 1 / 0.");
+    let result = engine.parse_query("X is 1 / 0?");
     assert!(result.is_err());
     
     // Engine should still work
-    let solutions = engine.parse_query("parent(tom, bob).").unwrap();
+    let solutions = engine.parse_query("parent(tom, bob)?").unwrap();
     assert_eq!(solutions.len(), 1);
 }
 
@@ -278,7 +278,7 @@ fn test_solution_limits() {
     }
     
     // Query should hit the solution limit
-    let result = engine.parse_query("number(X).");
+    let result = engine.parse_query("number(X)?");
     
     match result {
         Ok(solutions) => {
@@ -311,7 +311,7 @@ fn test_complex_error_scenarios() {
     // Test that the engine can distinguish between parse and runtime errors
     engine.parse_and_add("runtime_error :- X is Y.").unwrap(); // Valid syntax, runtime error
     
-    let result = engine.parse_query("runtime_error.");
+    let result = engine.parse_query("runtime_error?");
     assert!(result.is_err());
     if let Err(e) = result {
         let error_msg = format!("{}", e);
@@ -325,12 +325,12 @@ fn test_type_checking_errors() {
     let mut engine = PrologEngine::new();
     
     // Test type checking with wrong types
-    let result = engine.parse_query("var(123).");  // number is not a variable
+    let result = engine.parse_query("var(123)?");  // number is not a variable
     assert!(result.is_ok());
     let solutions = result.unwrap();
     assert_eq!(solutions.len(), 0); // Should fail, not error
     
-    let result = engine.parse_query("atom(X).");  // variable is not an atom (unless bound)
+    let result = engine.parse_query("atom(X)?");  // variable is not an atom (unless bound)
     assert!(result.is_ok());
     let solutions = result.unwrap();
     assert_eq!(solutions.len(), 0); // Should fail, not error
@@ -341,15 +341,15 @@ fn test_built_in_predicate_errors() {
     let mut engine = PrologEngine::new();
     
     // Test arithmetic predicates with wrong argument types
-    let result = engine.parse_query("X > atom.");
+    let result = engine.parse_query("X > atom?");
     assert!(result.is_err());
     
     // Test comparison with uninstantiated variables
-    let result = engine.parse_query("X > Y.");
+    let result = engine.parse_query("X > Y?");
     assert!(result.is_err());
     
     // Test unification with incompatible terms (should succeed but find no solutions)
-    let result = engine.parse_query("atom = 123.");
+    let result = engine.parse_query("atom = 123?");
     assert!(result.is_ok());
     let solutions = result.unwrap();
     assert_eq!(solutions.len(), 0);
@@ -370,7 +370,7 @@ fn test_parser_vs_runtime_errors() {
     
     // Runtime error - valid syntax, execution error
     engine.parse_and_add("divide_error :- X is 5 // 0.").unwrap();
-    let result = engine.parse_query("divide_error.");
+    let result = engine.parse_query("divide_error?");
     assert!(result.is_err());
     if let Err(e) = result {
         // This should be a runtime error

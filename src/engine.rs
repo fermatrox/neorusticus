@@ -263,28 +263,19 @@ impl PrologEngine {
         })?;
         
         // Step 3: Ensure the clause ends with a dot (Prolog convention)
+        // Clauses (facts and rules) MUST end with '.'
         parser.expect(Token::Dot).map_err(|e| {
             eprintln!("Expected '.' at end of clause: {}", e);
             e
         })?;
         
-        // Step 4: Validate the clause
-        // Facts (clauses with no body) must be ground (no variables)
-        if clause.is_fact() && !clause.is_ground() {
-            return Err(ParseError::InvalidSyntax {
-                message: format!("Facts cannot contain variables. Found variables in: {}", clause.head),
-                position: crate::error::Position::start(),
-                suggestion: Some("Either provide concrete values for all variables, or make it a rule with a body".to_string()),
-            });
-        }
-        
-        // Step 5: Update statistics with the new predicate information
+        // Step 4: Update statistics with the new predicate information
         // This tracks what predicates are defined and how many clauses each has
         if let Some((functor, arity)) = clause.head_functor_arity() {
             self.stats.add_predicate(functor, arity);
         }
         
-        // Step 6: Add the parsed clause to the database
+        // Step 5: Add the parsed clause to the database
         self.add_clause(clause);
         Ok(())
     }
@@ -299,12 +290,18 @@ impl PrologEngine {
         // Step 2: Parse the query as a list of goals (comma-separated terms)
         let goals = parser.parse_query()?;
         
-        // Step 3: Accept either '?' or '.' at end of query
-        // Different Prolog systems use different conventions
+        // Step 3: Queries MUST end with '?' 
+        // A dot '.' indicates a clause/fact to be added, not a query
         if *parser.current_token() == Token::Question {
             parser.advance();
+        } else if *parser.current_token() == Token::Dot {
+            return Err(Box::new(ParseError::InvalidSyntax {
+                message: "Queries must end with '?', not '.'. Use '.' only for facts and rules.".to_string(),
+                position: parser.current_position(),
+                suggestion: Some("Change the '.' to '?' to execute as a query, or use parse_and_add() to add as a clause".to_string()),
+            }));
         } else {
-            parser.expect(Token::Dot)?;
+            parser.expect(Token::Question)?;
         }
         
         // Step 4: Track query execution in statistics
@@ -596,10 +593,31 @@ impl PrologEngine {
         }
         
         // Print each solution, separated by semicolons (Prolog convention)
-        for (i, solution) in solutions.iter().enumerate() {
-            if i > 0 { 
+        let mut printed_any = false;
+        for solution in solutions.iter() {
+            // Check if this solution contains any generated variables
+            let mut has_generated_vars = false;
+            for var in original_vars {
+                if let Some(value) = solution.get(var) {
+                    let final_value = Unifier::apply_substitution(value, solution);
+                    if let Term::Variable(v) = &final_value {
+                        if v.starts_with("_G") {
+                            has_generated_vars = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            // Skip solutions with generated variables - they indicate an error
+            if has_generated_vars {
+                continue;
+            }
+            
+            if printed_any {
                 println!(" ;");  // Semicolon indicates alternative solutions
             }
+            printed_any = true;
             
             // Collect variable bindings for this solution
             let mut bindings = Vec::new();
@@ -608,6 +626,15 @@ impl PrologEngine {
                     // Apply substitution recursively to get the final value
                     // This resolves chains like X -> Y, Y -> 5 to X -> 5
                     let final_value = Unifier::apply_substitution(value, solution);
+                    
+                    // Double-check: never show generated variables
+                    if let Term::Variable(v) = &final_value {
+                        if v.starts_with("_G") {
+                            // This should not happen after our filter above
+                            panic!("Internal error: Generated variable {} in output", v);
+                        }
+                    }
+                    
                     bindings.push(format!("{} = {}", var, final_value));
                 }
             }
@@ -619,7 +646,13 @@ impl PrologEngine {
                 print!("{}", bindings.join(", "));
             }
         }
-        println!(".");  // End with a dot (Prolog convention)
+        
+        if !printed_any {
+            // All solutions had generated variables - this indicates an error
+            println!("false.");
+        } else {
+            println!(".");  // End with a dot (Prolog convention)
+        }
     }
     
     /// Print solutions in a more detailed format

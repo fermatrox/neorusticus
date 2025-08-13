@@ -622,10 +622,11 @@ fn test_engine_utils_batch_query() {
     engine.parse_and_add("parent(bob, ann).").unwrap();
     
     // Define batch of queries to test
+    // IMPORTANT: Queries must end with ? according to our rules
     let queries = vec![
-        "parent(tom, bob)",  // Should succeed (fact exists)
-        "parent(tom, ann)",  // Should fail (no such fact)
-        "parent(X, bob)",    // Should find X = tom
+        "parent(tom, bob)?",  // Should succeed (fact exists)
+        "parent(tom, ann)?",  // Should fail (no such fact)
+        "parent(X, bob)?",    // Should find X = tom
     ];
     
     let results = EngineUtils::batch_query(&mut engine, &queries);

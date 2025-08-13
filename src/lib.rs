@@ -123,7 +123,7 @@ pub fn parse_term(input: &str) -> ParseResult<Term> {
 ///     "grandparent(X, Z) :- parent(X, Y), parent(Y, Z)."
 /// ];
 /// 
-/// let solutions = quick_query(clauses, "grandparent(tom, X).").unwrap();
+/// let solutions = quick_query(clauses, "grandparent(tom, X)?").unwrap();
 /// println!("Found {} solutions", solutions.len());
 /// ```
 /// 

@@ -170,7 +170,7 @@ fn test_quick_query_basic() {
     // Create a small database with parent facts
     let clauses = &["parent(tom, bob).", "parent(bob, ann)."];
     // Query: "Who is tom's child?" (find X where parent(tom, X))
-    let solutions = quick_query(clauses, "parent(tom, X).").unwrap();
+    let solutions = quick_query(clauses, "parent(tom, X)?").unwrap();
     // Should find exactly one solution: X = bob
     assert_eq!(solutions.len(), 1);
     // Verify the variable binding in the solution
@@ -178,13 +178,13 @@ fn test_quick_query_basic() {
     
     // Test query with no solutions
     // Query: "Who is mary's child?" (mary is not in the database)
-    let solutions = quick_query(clauses, "parent(mary, X).").unwrap();
+    let solutions = quick_query(clauses, "parent(mary, X)?").unwrap();
     // Should find no solutions since mary is not a parent in our database
     assert_eq!(solutions.len(), 0);
     
     // Test ground query (no variables)
     // Query: "Is tom the parent of bob?" (yes/no question)
-    let solutions = quick_query(clauses, "parent(tom, bob).").unwrap();
+    let solutions = quick_query(clauses, "parent(tom, bob)?").unwrap();
     // Should succeed with one solution (true)
     // Even though there are no variables to bind, we get one empty substitution
     assert_eq!(solutions.len(), 1);
@@ -203,7 +203,7 @@ fn test_quick_query_with_rules() {
     ];
     
     // Query: "Who is tom's grandchild?"
-    let solutions = quick_query(clauses, "grandparent(tom, X).").unwrap();
+    let solutions = quick_query(clauses, "grandparent(tom, X)?").unwrap();
     // Should find one solution through the rule: X = ann
     assert_eq!(solutions.len(), 1);
     
@@ -216,7 +216,7 @@ fn test_quick_query_with_rules() {
     
     // Test finding all grandparent relationships
     // Query: "Find all grandparent-grandchild pairs"
-    let solutions = quick_query(clauses, "grandparent(X, Y).").unwrap();
+    let solutions = quick_query(clauses, "grandparent(X, Y)?").unwrap();
     // Should find only tom -> ann relationship
     assert_eq!(solutions.len(), 1);
 }
@@ -381,7 +381,7 @@ fn test_quick_query_empty_inputs() {
     // Test with empty clause list
     // An empty database should still work but find no solutions
     let clauses = &[];
-    let solutions = quick_query(clauses, "foo(X).").unwrap();
+    let solutions = quick_query(clauses, "foo(X)?").unwrap();
     assert_eq!(solutions.len(), 0); // No clauses, no solutions
     
     // Test with empty query (should fail)
@@ -398,7 +398,7 @@ fn test_quick_query_invalid_inputs() {
     // Test with invalid clause syntax
     // Missing closing parenthesis should cause parse error
     let clauses = &["invalid syntax here"];
-    let result = quick_query(clauses, "foo(X).");
+    let result = quick_query(clauses, "foo(X)?");
     assert!(result.is_err());
     
     // Test with invalid query syntax
@@ -409,7 +409,7 @@ fn test_quick_query_invalid_inputs() {
     // Test with missing dots in clauses
     // Prolog clauses must end with periods
     let clauses = &["foo(bar)", "baz(qux)"];
-    let result = quick_query(clauses, "foo(X).");
+    let result = quick_query(clauses, "foo(X)?");
     assert!(result.is_err());
 }
 
@@ -424,7 +424,7 @@ fn test_quick_query_circular_references() {
     
     // Should handle gracefully (either timeout or stack limit)
     // The engine should detect stack overflow and return an error
-    let result = quick_query(clauses, "loop(test).");
+    let result = quick_query(clauses, "loop(test)?");
     assert!(result.is_err());
 }
 
@@ -439,7 +439,7 @@ fn test_quick_query_mutual_recursion() {
     ];
     
     // Should handle infinite mutual recursion gracefully
-    let result = quick_query(clauses, "ping(test).");
+    let result = quick_query(clauses, "ping(test)?");
     assert!(result.is_err()); // Should detect stack overflow
 }
 
@@ -469,17 +469,17 @@ fn test_quick_query_complex_programs() {
     ];
     
     // Test finding all fathers
-    let solutions = quick_query(clauses, "father(X, Y).").unwrap();
+    let solutions = quick_query(clauses, "father(X, Y)?").unwrap();
     assert!(solutions.len() > 0);
     
     // Test finding ancestors
     // Tom should be ancestor of bob, liz, ann, pat, jim
-    let solutions = quick_query(clauses, "ancestor(tom, X).").unwrap();
+    let solutions = quick_query(clauses, "ancestor(tom, X)?").unwrap();
     assert!(solutions.len() >= 4);
     
     // Test specific query
     // Tom should be ancestor of jim (through bob and pat)
-    let solutions = quick_query(clauses, "ancestor(tom, jim).").unwrap();
+    let solutions = quick_query(clauses, "ancestor(tom, jim)?").unwrap();
     assert_eq!(solutions.len(), 1); // Should find the path
 }
 
@@ -498,7 +498,7 @@ fn test_quick_query_with_arithmetic() {
     
     // Test arithmetic evaluation
     // Query: what is 2 + 3?
-    let solutions = quick_query(clauses, "sum(2, 3, Z).").unwrap();
+    let solutions = quick_query(clauses, "sum(2, 3, Z)?").unwrap();
     assert_eq!(solutions.len(), 1);
     
     // Apply substitution to resolve the variable fully
@@ -508,11 +508,11 @@ fn test_quick_query_with_arithmetic() {
     
     // Test comparison
     // 5 > 3 should succeed
-    let solutions = quick_query(clauses, "greater(5, 3).").unwrap();
+    let solutions = quick_query(clauses, "greater(5, 3)?").unwrap();
     assert_eq!(solutions.len(), 1); // Should succeed
     
     // 3 > 5 should fail
-    let solutions = quick_query(clauses, "greater(3, 5).").unwrap();
+    let solutions = quick_query(clauses, "greater(3, 5)?").unwrap();
     assert_eq!(solutions.len(), 0); // Should fail
 }
 
@@ -530,12 +530,12 @@ fn test_quick_query_with_lists() {
     ];
     
     // Test finding first element
-    let solutions = quick_query(clauses, "first([1, 2, 3], X).").unwrap();
+    let solutions = quick_query(clauses, "first([1, 2, 3], X)?").unwrap();
     assert_eq!(solutions.len(), 1);
     assert_eq!(solutions[0].get("X"), Some(&Term::Number(1)));
     
     // Test finding last element (recursive)
-    let solutions = quick_query(clauses, "last([1, 2, 3], X).").unwrap();
+    let solutions = quick_query(clauses, "last([1, 2, 3], X)?").unwrap();
     assert_eq!(solutions.len(), 1);
     
     // Apply substitution to resolve the variable fully
@@ -555,7 +555,7 @@ fn test_quick_query_with_cut() {
     ];
     
     // Cut should prevent backtracking to second clause
-    let solutions = quick_query(clauses, "max(5, 3, Z).").unwrap();
+    let solutions = quick_query(clauses, "max(5, 3, Z)?").unwrap();
     assert_eq!(solutions.len(), 1);
     
     // Apply substitution to resolve the variable fully
@@ -564,7 +564,7 @@ fn test_quick_query_with_cut() {
     assert_eq!(resolved, Term::Number(5));
     
     // Test when first clause fails
-    let solutions = quick_query(clauses, "max(3, 5, Z).").unwrap();
+    let solutions = quick_query(clauses, "max(3, 5, Z)?").unwrap();
     assert_eq!(solutions.len(), 1);
     
     // Apply substitution to resolve the variable fully
@@ -582,28 +582,28 @@ fn test_quick_query_builtin_predicates() {
     
     // Test append
     // append/3 concatenates two lists
-    let solutions = quick_query(clauses, "append([1, 2], [3, 4], X).").unwrap();
+    let solutions = quick_query(clauses, "append([1, 2], [3, 4], X)?").unwrap();
     assert_eq!(solutions.len(), 1);
     // X should be [1, 2, 3, 4]
     
     // Test member
     // member/2 checks list membership
-    let solutions = quick_query(clauses, "member(2, [1, 2, 3]).").unwrap();
+    let solutions = quick_query(clauses, "member(2, [1, 2, 3])?").unwrap();
     assert_eq!(solutions.len(), 1); // 2 is a member
     
     // Test length
     // length/2 computes list length
-    let solutions = quick_query(clauses, "length([a, b, c], X).").unwrap();
+    let solutions = quick_query(clauses, "length([a, b, c], X)?").unwrap();
     assert_eq!(solutions.len(), 1);
     assert_eq!(solutions[0].get("X"), Some(&Term::Number(3)));
     
     // Test type checking
     // atom/1 checks if term is an atom
-    let solutions = quick_query(clauses, "atom(hello).").unwrap();
+    let solutions = quick_query(clauses, "atom(hello)?").unwrap();
     assert_eq!(solutions.len(), 1); // Should succeed
     
     // number/1 checks if term is a number
-    let solutions = quick_query(clauses, "number(hello).").unwrap();
+    let solutions = quick_query(clauses, "number(hello)?").unwrap();
     assert_eq!(solutions.len(), 0); // Should fail
 }
 
@@ -656,16 +656,16 @@ fn test_quick_query_multiple_solutions() {
     ];
     
     // Find all colors
-    let solutions = quick_query(clauses, "color(X).").unwrap();
+    let solutions = quick_query(clauses, "color(X)?").unwrap();
     assert_eq!(solutions.len(), 3);  // red, green, blue
     
     // Find all primary colors (including one not in color/1)
-    let solutions = quick_query(clauses, "primary(X).").unwrap();
+    let solutions = quick_query(clauses, "primary(X)?").unwrap();
     assert_eq!(solutions.len(), 3);  // red, blue, yellow
     
     // Combined query - find colors that are also primary
     // This uses conjunction (comma means AND)
-    let solutions = quick_query(clauses, "color(X), primary(X).").unwrap();
+    let solutions = quick_query(clauses, "color(X), primary(X)?").unwrap();
     assert_eq!(solutions.len(), 2); // red and blue
 }
 
@@ -703,7 +703,7 @@ fn test_quick_query_error_propagation() {
     // Syntax error in clause
     // Missing closing parenthesis should be caught
     let clauses = &["foo(bar"];
-    let result = quick_query(clauses, "foo(X).");
+    let result = quick_query(clauses, "foo(X)?");
     assert!(result.is_err());
     
     // Syntax error in query
@@ -715,7 +715,7 @@ fn test_quick_query_error_propagation() {
     // Runtime error (division by zero in arithmetic)
     // Division by zero should be caught during execution
     let clauses = &["divide_by_zero(X) :- X is 5 // 0."];
-    let result = quick_query(clauses, "divide_by_zero(X).");
+    let result = quick_query(clauses, "divide_by_zero(X)?");
     assert!(result.is_err());
 }
 
@@ -731,7 +731,7 @@ fn test_integration_parse_and_query() {
     let clauses = &["parent(tom, bob).", "parent(bob, ann)."];
     
     // Query for the parsed term structure
-    let solutions = quick_query(clauses, "parent(tom, bob).").unwrap();
+    let solutions = quick_query(clauses, "parent(tom, bob)?").unwrap();
     assert_eq!(solutions.len(), 1);
     
     // Verify term structure matches what we'd get in the engine
